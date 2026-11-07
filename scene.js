@@ -10,9 +10,9 @@ var sceneSync = null;
 if (MINI) return;
 const hdr = document.getElementById("hero") || document.querySelector("main > header"); if (!hdr) return;
 const box = document.createElement("div"); box.className = "sc"; box.setAttribute("aria-hidden", "true");
-box.innerHTML = '<svg viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><svg class="sc-move" viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><div class="sc-grain"></div><div class="sc-rain"></div><div class="sc-snow"></div><div class="sc-flash"></div>';
+box.innerHTML = '<svg viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><svg class="sc-move" viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><div class="sc-grain"></div><canvas class="sc-fx"></canvas><div class="sc-flash"></div>';
 (document.getElementById("hero") || document.querySelector(".hello") || hdr).prepend(box);
-const svg = box.querySelector("svg"), mv = box.querySelector(".sc-move"), precip = { rain: box.querySelector(".sc-rain"), snow: box.querySelector(".sc-snow") };
+const svg = box.querySelector("svg"), mv = box.querySelector(".sc-move"), fxc = box.querySelector(".sc-fx"), flashEl = box.querySelector(".sc-flash");
 var SC_START = 450, SC_END = 990, SW = 900; // SW: Breite der Szene, passend zum Banner (nichts wird gestreckt oder abgeschnitten)
 const W = { cover: 0, rain: 0, snow: 0, fog: 0, storm: false, sunrise: 0, sunset: 0 }; // sunrise/sunset in Minuten (vom Wetterdienst)
 const NS = "http://www.w3.org/2000/svg";
@@ -78,6 +78,13 @@ function build() {
   <radialGradient id="sc-st"><stop id="sc-st0" offset="0" stop-opacity=".85"/><stop id="sc-st1" offset=".55" stop-opacity=".35"/><stop id="sc-st2" offset="1" stop-opacity="0"/></radialGradient>
   <linearGradient id="sc-trail" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".55"/></linearGradient>
   <linearGradient id="sc-lake" x1="0" y1="0" x2="0" y2="1"><stop id="sc-lk0" offset="0"/><stop id="sc-lk1" offset="1"/></linearGradient>
+  <linearGradient id="sc-cl" x1="0" y1="0" x2="0" y2="1"><stop id="sc-c0" offset="0"/><stop id="sc-c1" offset=".5"/><stop id="sc-c2" offset="1"/></linearGradient>
+  <linearGradient id="sc-cd" x1="0" y1="0" x2="0" y2="1"><stop id="sc-d0" offset="0"/><stop id="sc-d1" offset=".55"/><stop id="sc-d2" offset="1"/></linearGradient>
+  <linearGradient id="sc-cdu" x1="0" y1="0" x2="0" y2="70" gradientUnits="userSpaceOnUse"><stop id="sc-du0" offset="0"/><stop id="sc-du1" offset=".6"/><stop id="sc-du2" offset="1"/></linearGradient>
+  <linearGradient id="sc-clu" x1="0" y1="0" x2="0" y2="50" gradientUnits="userSpaceOnUse"><stop id="sc-lu0" offset="0"/><stop id="sc-lu1" offset="1"/></linearGradient>
+  <linearGradient id="sc-shaft" x1="0" y1="0" x2="0" y2="1"><stop id="sc-sh0" offset="0" stop-opacity=".55"/><stop id="sc-sh1" offset="1" stop-opacity="0"/></linearGradient>
+  <filter id="sc-soft" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="1.1"/></filter>
+  <filter id="sc-blur5" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
   <filter id="sc-blur8" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="8"/></filter>
   <filter id="sc-blur3" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
   <filter id="sc-grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .55 0"/></filter>`;
@@ -100,6 +107,7 @@ function build() {
   for (let i = 0; i < 7; i++) mk("path", { d: `M0 0 L${-60 + i * 22} 220 L${-44 + i * 22} 220Z`, fill: "url(#sc-ray)" }, L.rays);
   L.bloom = mk("circle", { r: 120, fill: "url(#sc-bloom)" });
   L.sun = mk("circle", { r: 13 });
+  L.clouds = mk("g", { class: "sc-clouds" }); // echte Wolken: vor Sonne/Mond, hinter den Bergen
   // Hohe Schleierwolken (weich, lang)
   L.streaks = mk("g", {}, mv);
   [[30, 260, 5, 180], [52, 340, 4, 240], [74, 200, 3.5, 210], [22, 180, 3, 300]].forEach(([y, w, h, dur], i) => {
@@ -181,9 +189,73 @@ function build() {
     }
   });
   if (!L.shimmer) L.shimmer = mk("g", {}, mv);
+  L.fogm = mk("g", {}, mv); // ziehender Nebel (nur bei Nebel sichtbar)
   L.fx = mk("g", {}, mv);
+  buildClouds();
   // Filmkorn
   draw(cur);
+}
+
+// ---------- Wolken: Quellwolken, die ziehen; bei Regen eine dunkle Decke mit Regenschleiern ----------
+let wxKey = "";
+const wKey = () => [Math.round(W.cover * 5), W.rain > 0, W.snow > 0, W.storm, W.fog > 0].join();
+function puff(g, cx, cy, w, h, R, fill, flat = true) {
+  // Wolke aus überlappenden Kugeln: flache Unterseite, oben hoch gewölbt, jede Kugel oben hell, unten im Schatten
+  const n = Math.max(4, Math.round(w / 16));
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1), hump = Math.sin(Math.PI * (.15 + t * .7));
+    const r = (w / n) * (.85 + R() * .6) * (.6 + hump * .7);
+    mk("circle", { cx: cx - w / 2 + t * w + (R() - .5) * 6, cy: cy - r * .55 - hump * h * .35 * R(), r, fill }, g);
+  }
+  for (let i = 0; i < Math.round(n / 2); i++) { // Krone
+    const r = (w / n) * (1.1 + R() * .7);
+    mk("circle", { cx: cx - w * .25 + R() * w * .5, cy: cy - h * (.45 + R() * .3), r, fill }, g);
+  }
+  if (flat) mk("ellipse", { cx, cy: cy + 1, rx: w * .52, ry: Math.max(3, h * .16), fill }, g); // flacher Boden
+}
+function drift(g, w, dur, R) {
+  try { const a = g.animate([{ transform: `translateX(${-w}px)` }, { transform: `translateX(${SW + w}px)` }], { duration: dur * 1000, iterations: Infinity, easing: "linear" }); a.currentTime = R() * dur * 1000; } catch {}
+}
+function buildClouds() {
+  if (!L.clouds) return;
+  L.clouds.innerHTML = ""; L.fogm.innerHTML = ""; wxKey = wKey(); fx.parts = [];
+  const R = seeded(Math.round(W.cover * 10) * 7 + (W.rain ? 3 : 0) + (W.snow ? 5 : 0) + 11), wet = W.rain || W.snow, wind = W.storm ? 2.4 : wet ? 1.5 : 1;
+  // Quellwolken (Schönwetter bis bewölkt)
+  const n = wet ? Math.round(3 + W.cover * 3) : Math.round(W.cover * 9 + (W.cover > .15 ? 1 : 0));
+  for (let i = 0; i < n; i++) {
+    const depth = R(), w = 70 + depth * 120 + R() * 40, h = w * (.38 + R() * .2), y = 34 + (1 - depth) * 30 + R() * 22;
+    const g = mk("g", { filter: wet ? "url(#sc-blur3)" : "url(#sc-soft)", opacity: (.75 + depth * .25).toFixed(2) }, L.clouds);
+    if (wet) puff(g, 0, y + 10, w * 1.4, h * .5, R, "url(#sc-cdu)", false); // zerfranste Regenfetzen
+    else puff(g, 0, y, w, h, R, "url(#sc-cl)");
+    drift(g, w, (520 - depth * 260 + R() * 120) / wind, R);
+  }
+  // Regen- / Schneedecke: tief hängend über die ganze Breite, Unterseite wellig (von unten gesehen)
+  if (wet || W.cover > .85) {
+    const deck = mk("g", {}, L.clouds), base = W.storm ? 54 : wet ? 46 : 30;
+    let d = `M-20 -10 L${SW + 20} -10 L${SW + 20} ${base}`;
+    for (let x = SW + 20; x > -20;) { const bw = 30 + R() * 46, by = base + (R() - .3) * 10; d += ` Q${x - bw / 2} ${by + 12 + R() * 10} ${x - bw} ${by}`; x -= bw; }
+    mk("path", { d: d + " Z", fill: wet ? "url(#sc-cdu)" : "url(#sc-clu)", filter: "url(#sc-blur3)" }, deck);
+    for (let i = 0; i < Math.round(SW / 70); i++) { // einzelne tiefere Fetzen
+      const x = R() * SW, y = base - 2 + R() * 10, rx = 30 + R() * 40;
+      mk("ellipse", { cx: x, cy: y, rx, ry: 6 + R() * 6, fill: wet ? "url(#sc-cdu)" : "url(#sc-clu)", filter: "url(#sc-blur3)", opacity: .9 }, deck);
+    }
+    L.deck = deck;
+  } else L.deck = null;
+  // Regenschleier unter den Wolken (schräg, weich)
+  if (W.rain || W.snow) {
+    const sh = mk("g", { filter: "url(#sc-blur5)", opacity: (W.snow ? .35 : .25 + W.rain * .35).toFixed(2) }, L.clouds);
+    for (let i = 0; i < Math.round(SW / 160); i++) {
+      const x = R() * SW, w = 40 + R() * 80, g = mk("g", {}, sh);
+      mk("path", { d: `M${x} 30 L${x + w} 30 L${x + w - 26} 170 L${x - 26} 170Z`, fill: "url(#sc-shaft)" }, g);
+      drift(g, 0, (300 + R() * 200) / wind, R);
+    }
+  }
+  // Ziehender Nebel
+  if (W.fog) for (let i = 0; i < 6; i++) {
+    const g = mk("g", { filter: "url(#sc-blur8)" }, L.fogm), y = 120 + R() * 70, w = 260 + R() * 260;
+    mk("ellipse", { cx: 0, cy: y, rx: w / 2, ry: 12 + R() * 14, class: "fogm" }, g);
+    drift(g, w / 2, 260 + R() * 220, R);
+  }
 }
 
 // Nebelbänke zwischen Schichten (für alle Landschaften)
@@ -256,7 +328,7 @@ let cur = 720;
 function draw(m) {
   cur = m;
   let [top, mid, hor] = sky(m); const d = daylight(m), night = 1 - d, se = SEASON[season];
-  const ov = Math.min(1, W.cover * .7 + (W.rain || W.snow ? .25 : 0)); // Bewölkung färbt den Himmel grau
+  const ov = Math.min(1, W.cover * .7 + (W.rain || W.snow ? .25 : 0) + (W.storm ? .2 : 0)); // Bewölkung färbt den Himmel grau
   if (ov > 0) { const g = (a, b) => mix(a, b, night * .85); top = mix(top, g("#8E98A5", "#10121A"), ov * .8); mid = mix(mid, g("#B3BAC3", "#181A24"), ov * .75); hor = mix(hor, g("#C7CCD2", "#22242E"), ov * .6); }
   ["sc-s0", "sc-s1", "sc-s2"].forEach((id, i) => document.getElementById(id).setAttribute("stop-color", [top, mid, hor][i]));
   // Luftperspektive: hinten fast Horizontfarbe, vorne dunkel; tagsüber mit Jahreszeit-Ton
@@ -297,11 +369,24 @@ function draw(m) {
   // Lichter im Tal
   const on = m > SC_END - 10 ? Math.min(1, (m - (SC_END - 10)) / 110) : m < SC_START ? Math.max(0, (SC_START - m) / 50) : 0;
   L.lights.forEach(([c, th]) => c.setAttribute("opacity", th < on ? .95 : 0));
-  precip.rain.style.opacity = W.rain ? (.35 + W.rain * .45) * (night > .5 ? .6 : 1) : 0;
-  precip.snow.style.opacity = W.snow ? .5 + W.snow * .5 : 0;
-  hdr.classList.toggle("sc-storm", !!W.storm);
+  { // Wolken: oben angestrahlt (bei tiefer Sonne warm), unten Schatten; nachts dunkel
+    const warm = low && p > -.1 && p < 1.1 ? 1 : 0;
+    let lit = mix("#FFFFFF", hor, .12 + warm * .45);
+    lit = mix(lit, mix(top, "#3A4060", .35), night * .85);
+    const shade = mix(mix(lit, "#7F8AA0", .5), "#1A1D2C", night * .6);
+    const set = (id, c) => document.getElementById(id)?.setAttribute("stop-color", c);
+    set("sc-c0", lit); set("sc-c1", mix(lit, shade, .35)); set("sc-c2", shade);
+    const dTop = mix(mix(W.storm ? "#7E8798" : "#9AA3B2", hor, .12 + warm * .3), "#2C3142", night * .75), dBot = mix(W.storm ? "#2A2F3B" : "#4A5160", "#151824", night * .65);
+    set("sc-d0", dTop); set("sc-d1", mix(dTop, dBot, .55)); set("sc-d2", dBot);
+    set("sc-du0", mix(dBot, "#000000", .2 * (1 - night))); set("sc-du1", mix(dBot, dTop, .2)); set("sc-du2", mix(dBot, dTop, .55));
+    set("sc-lu0", shade); set("sc-lu1", mix(lit, shade, .4));
+    set("sc-sh0", mix(dBot, "#C9D2DE", W.snow ? .7 : .25)); set("sc-sh1", dBot);
+    box.querySelectorAll(".fogm").forEach((f) => { f.setAttribute("fill", mix(hor, "#FFFFFF", d * .35 + morning * .2)); f.setAttribute("opacity", (W.fog * (.45 + morning * .25)).toFixed(2)); });
+    fx.night = night; fx.d = d;
+  }
+  fxSync();
   // Schrift passend zum Himmel
-  const light = lum(mix(top, mid, .5)) > .5;
+  const light = lum(mix(top, mid, .5)) > .5 && !W.storm; // bei Gewitter hängt die dunkle Decke hinter der Schrift
   hdr.style.setProperty("--hfg", light ? "#142030" : "#F6F2FA");
   hdr.style.setProperty("--hfg2", light ? "#34465C" : "#C9C4DA");
   hdr.classList.toggle("sc-light", light);
@@ -404,6 +489,105 @@ function minuteNow() {
 // Filmkorn einmal als Bild erzeugen
 try { const c = document.createElement("canvas"); c.width = c.height = 128; const g = c.getContext("2d"), im = g.createImageData(128, 128); for (let i = 0; i < im.data.length; i += 4) { const v = Math.random() * 255; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 26; } g.putImageData(im, 0, 0); box.querySelector(".sc-grain").style.backgroundImage = `url(${c.toDataURL()})`; } catch {}
 let lastPk = "";
+
+// ---------- Regen, Schnee, Blitze: Canvas mit Tiefe, Wind und Böen ----------
+const fx = { parts: [], splash: [], bolt: null, raf: 0, last: 0, w: 0, h: 0, dpr: 1, night: 0, d: 1, nextBolt: 0, t: 0 };
+const fxg = fxc.getContext("2d");
+function fxSize() {
+  const r = box.getBoundingClientRect(), dpr = Math.min(1.5, devicePixelRatio || 1);
+  if (!r.width || !r.height) return false;
+  if (Math.round(r.width) !== fx.w || Math.round(r.height) !== fx.h || dpr !== fx.dpr) { fx.w = Math.round(r.width); fx.h = Math.round(r.height); fx.dpr = dpr; fxc.width = fx.w * dpr; fxc.height = fx.h * dpr; fx.parts = []; }
+  return true;
+}
+const fxActive = () => on && (W.rain || W.snow || W.storm) && !document.hidden && !reduce.matches && !document.body.classList.contains("idle");
+function spawn(top) {
+  const z = .25 + Math.random() * .75, snow = !!W.snow && !(W.rain && Math.random() < .5);
+  return { x: Math.random() * (fx.w + 120) - 60, y: top ? Math.random() * fx.h : -20 - Math.random() * 40, z, snow, ph: Math.random() * 6.28, f: .6 + Math.random() * 1.2 };
+}
+function fxSync() {
+  if (!fxActive()) { if (fx.raf) { cancelAnimationFrame(fx.raf); fx.raf = 0; } if (fx.w) fxg.clearRect(0, 0, fxc.width, fxc.height); fx.parts = []; return; }
+  if (!fx.raf) { fx.last = performance.now(); fx.raf = requestAnimationFrame(fxStep); }
+}
+function makeBolt() {
+  // Blitz: zickzack von der Wolkenunterseite bis zu den Bergen, mit Verästelungen
+  const segs = [], x0 = fx.w * (.1 + Math.random() * .8), y1 = fx.h * (.5 + Math.random() * .25);
+  const branch = (x, y, len, ang, depth) => {
+    let px = x, py = y; const steps = Math.round(len / 9);
+    for (let i = 0; i < steps; i++) {
+      const nx = px + Math.sin(ang) * 10 + (Math.random() - .5) * 18, ny = py + Math.cos(ang) * 10;
+      segs.push([px, py, nx, ny, depth]); px = nx; py = ny;
+      if (depth < 2 && Math.random() < .09) branch(px, py, len * (.25 + Math.random() * .3), ang + (Math.random() < .5 ? -1 : 1) * (.4 + Math.random() * .6), depth + 1);
+    }
+  };
+  branch(x0, fx.h * .2, y1 - fx.h * .2, (Math.random() - .5) * .3, 0);
+  return { segs, x: x0, t0: performance.now(), dur: 520 };
+}
+function fxStep(now) {
+  fx.raf = 0;
+  if (!fxActive() || !fxSize()) { fxSync(); return; }
+  const dt = Math.min(.05, (now - fx.last) / 1000); fx.last = now; fx.t += dt;
+  const { w, h } = fx, g = fxg;
+  g.setTransform(fx.dpr, 0, 0, fx.dpr, 0, 0); g.clearRect(0, 0, w, h);
+  // Böen: Stärke und Wind schwanken langsam
+  const gust = .75 + .25 * Math.sin(fx.t * .45) + .12 * Math.sin(fx.t * 1.7 + 1), wind = (W.storm ? .32 : .16) * gust + .05 * Math.sin(fx.t * .3);
+  const amt = Math.max(W.rain, W.snow * .9, W.storm ? .7 : 0);
+  const target = Math.round((w * h) / (W.snow && !W.rain ? 2600 : 1500) * amt * gust);
+  while (fx.parts.length < target) fx.parts.push(spawn(fx.parts.length < target * .6 && fx.t < .2));
+  if (fx.parts.length > target + 20) fx.parts.length = target;
+  const dim = 1 - fx.night * .55, ground = h * .86;
+  g.lineCap = "round";
+  for (const q of fx.parts) {
+    if (q.snow) {
+      const vy = (18 + q.z * 46) * (W.storm ? 1.4 : 1);
+      q.y += vy * dt; q.x += (wind * 90 * q.z + Math.sin(fx.t * q.f + q.ph) * 14 * q.z) * dt;
+      const r = .5 + q.z * q.z * 2.4;
+      g.globalAlpha = (.35 + q.z * .6) * dim;
+      g.fillStyle = "#FFFFFF";
+      g.beginPath(); g.arc(q.x, q.y, r, 0, 6.283); g.fill();
+      if (q.z > .85) { g.globalAlpha = .12 * dim; g.beginPath(); g.arc(q.x, q.y, r * 2.4, 0, 6.283); g.fill(); } // nahe Flocken unscharf
+    } else {
+      const sp = (420 + q.z * 760) * (W.storm ? 1.15 : 1), vx = wind * sp;
+      q.y += sp * dt; q.x += vx * dt;
+      const len = 7 + q.z * 17;
+      g.globalAlpha = (.12 + q.z * .38) * dim * (.7 + W.rain * .3);
+      g.strokeStyle = fx.night > .5 ? "#9FB0C8" : "#E4ECF6"; g.lineWidth = .5 + q.z * .8;
+      g.beginPath(); g.moveTo(q.x, q.y); g.lineTo(q.x - vx / sp * len, q.y - len); g.stroke();
+      if (q.z > .7 && q.y > ground + (q.ph / 6.28) * (h - ground)) { fx.splash.push({ x: q.x, y: q.y, t: 0, z: q.z }); q.y = h + 99; }
+    }
+    if (q.y > h + 10 || q.x < -80 || q.x > w + 80) Object.assign(q, spawn(false));
+  }
+  // Spritzer am Boden
+  g.strokeStyle = fx.night > .5 ? "#9FB0C8" : "#E4ECF6";
+  fx.splash = fx.splash.filter((sp) => {
+    sp.t += dt; const k = sp.t / .22; if (k >= 1) return false;
+    g.globalAlpha = (1 - k) * .5 * sp.z * dim; g.lineWidth = .6;
+    const r = 1.5 + k * 4 * sp.z;
+    g.beginPath(); g.ellipse(sp.x, sp.y, r, r * .35, 0, Math.PI, 0); g.stroke();
+    return true;
+  });
+  // Gewitter
+  if (W.storm) {
+    if (!fx.nextBolt) fx.nextBolt = now + 2500 + Math.random() * 4000;
+    if (now > fx.nextBolt && !fx.bolt) { fx.bolt = makeBolt(); fx.nextBolt = now + 5000 + Math.random() * 11000; }
+    if (fx.bolt) {
+      const k = (now - fx.bolt.t0) / fx.bolt.dur;
+      if (k >= 1) { fx.bolt = null; flashEl.style.opacity = 0; box.classList.remove("sc-lit"); }
+      else {
+        const fl = k < .12 ? 1 : k < .22 ? .25 : k < .34 ? .9 : k < .45 ? .15 : (1 - k) * .6; // Flackern wie echt
+        g.globalAlpha = fl; g.shadowColor = "#AFC0FF"; g.shadowBlur = 18;
+        for (const [x1, y1, x2, y2, dpt] of fx.bolt.segs) { g.strokeStyle = dpt ? "#D4DCFF" : "#FFFFFF"; g.lineWidth = dpt ? 1 / dpt : 2.4; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+        g.shadowBlur = 0;
+        flashEl.style.background = `radial-gradient(ellipse at ${fx.bolt.x}px 20%, rgb(220 228 255 / .9), rgb(200 210 255 / .25) 45%, transparent 75%)`;
+        flashEl.style.opacity = (fl * (.35 + fx.night * .3)).toFixed(2);
+        box.classList.toggle("sc-lit", fl > .5);
+      }
+    }
+  } else fx.nextBolt = 0;
+  g.globalAlpha = 1;
+  fx.raf = requestAnimationFrame(fxStep);
+}
+document.addEventListener("visibilitychange", () => fxSync());
+new MutationObserver(() => fxSync()).observe(document.body, { attributes: true, attributeFilter: ["class"] });
 let built = false, on = false, tick = 0, evT = 0, leafT = 0;
 const quiet = () => document.hidden || reduce.matches; // Ereignisse auch, wenn Erledigt sichtbar, aber nicht aktiv ist – nur nicht minimiert/verdeckt
 let lastEv = 0;
@@ -412,17 +596,18 @@ function nextEvent() { clearTimeout(evT); evT = setTimeout(() => { if (on && !qu
 window.addEventListener("focus", () => { if (on && !quiet() && Date.now() - lastEv > 300000) setTimeout(() => { lastEv = Date.now(); randomEvent(); }, 1500); });
 function measure() { const w = box.clientWidth, h = box.clientHeight; return w && h ? Math.max(700, Math.min(2600, Math.round(210 * w / h))) : SW; }
 let seasonTest = null, playing = 0;
-function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || theme() !== TH || Math.abs(nw - SW) > 30) { season = s; SW = nw; build(); built = true; } draw(minuteNow()); }
+function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || theme() !== TH || Math.abs(nw - SW) > 30) { season = s; SW = nw; build(); built = true; } else if (wKey() !== wxKey) buildClouds(); draw(minuteNow()); }
 let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); }, 250); }).observe(box); } catch {}
 sceneSync = () => {
   const want = !!design.w.scene;
   document.body.classList.toggle("has-scene", want);
+  if (typeof syncTitlebar === "function") syncTitlebar();
   const pk = JSON.stringify(placeNow());
   if (want === on) { if (on) { refresh(); if (pk !== lastPk) { lastPk = pk; loadWeather(true).then(refresh); } } return; }
   lastPk = pk;
   on = want;
   clearInterval(tick); clearTimeout(evT); clearInterval(leafT);
-  if (!on) { svg.innerHTML = ""; built = false; return; }
+  if (!on) { svg.innerHTML = ""; built = false; fxSync(); return; }
   refresh();
   loadWeather().then(refresh);
   tick = setInterval(() => { refresh(); if (new Date().getMinutes() % 30 === 0) loadWeather().then(refresh); }, 60000);
@@ -442,6 +627,6 @@ const skyTest = {
   },
   state: () => ({ weather: store.get("erledigt-wetter-test", "") || "echt", season: seasonTest || "echt" }),
 };
-window.__scene = { EV, skyTest, reloadWeather: () => loadWeather(true).then(refresh), sw: () => SW, draw: (m) => draw(m), weather: (c, cv) => { applyWeather(c, cv); refresh(); }, season: (s) => { season = s; build(); draw(minuteNow()); } }; // für Tests
+window.__scene = { bolt: () => { fx.bolt = makeBolt(); }, EV, skyTest, reloadWeather: () => loadWeather(true).then(refresh), sw: () => SW, draw: (m) => draw(m), weather: (c, cv) => { applyWeather(c, cv); refresh(); }, season: (s) => { season = s; build(); draw(minuteNow()); } }; // für Tests
 sceneSync();
 })();
