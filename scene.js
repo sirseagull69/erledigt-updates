@@ -323,12 +323,12 @@ function buildCity() {
 // ---------- Schlicht: nur Himmel und eine sanfte Hügelkante ----------
 function buildPlain() { const R = seeded(3); layer(ridgeD(ridgePts(11, 150, 12, .4, false))); fogBand(150, R); layer(ridgeD(ridgePts(23, 172, 8, .3, false))); L.frontPts = [[SW * .2, 196]]; L.lake = [SW * .2, SW * .2]; }
 
-// Im Browser-Tab (nicht Home-Bildschirm) liegt die Statusleiste über der Seite und wird eingefärbt:
-// dort die Himmelfarbe zeigen, damit der Übergang oben nahtlos ist. In der Home-Bildschirm-App läuft die Landschaft ohnehin drunter.
-const SC_STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+// Wo die Statusleiste eine eigene Fläche ist (Browser-Tab, Android-Chrome-App), wird sie in der Himmelfarbe eingefärbt,
+// damit der Übergang oben nahtlos ist. Nur iPhone-Home-Bildschirm und die APK zeichnen die Landschaft selbst drunter.
+const SC_UNDER = navigator.standalone === true || /ErledigtAndroid/.test(navigator.userAgent);
 let skyTop = null;
 function topBar() {
-  const on = !!skyTop && !SC_STANDALONE && document.body.classList.contains("has-scene") && window.scrollY < 40;
+  const on = !!skyTop && !SC_UNDER && document.body.classList.contains("has-scene") && window.scrollY < 40;
   const c = on ? skyTop : getComputedStyle(document.body).backgroundColor;
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.getAttribute("content") !== c && m.setAttribute("content", c));
   document.documentElement.style.backgroundColor = on ? skyTop : "";
