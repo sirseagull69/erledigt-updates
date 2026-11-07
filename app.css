@@ -275,3 +275,8 @@ body.has-scene .wx-now small { color: var(--hfg2, #ddd); }
 .day { position: relative; }
 .day-wx { position: absolute; top: 2px; right: 2px; opacity: .9; }
 .day-wx svg { width: 13px; height: 13px; }
+/* Wetter im Kopf besser lesbar: kleine Glas-Pille */
+.wx-now { margin-top: 8px; padding: 4px 11px 4px 7px; border-radius: 99px; background: var(--chip); }
+.wx-now svg { width: 22px; height: 22px; filter: drop-shadow(0 1px 2px rgb(0 0 0 / .35)); }
+body.has-scene .wx-now { background: rgb(10 14 30 / .34); color: #fff; text-shadow: none; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+body.has-scene .wx-now small { color: rgb(255 255 255 / .75); }
