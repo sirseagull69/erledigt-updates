@@ -1,10 +1,10 @@
-# Macht aus einem Upload-Tag (upload-2.6.6) ein GitHub-Release mit den Dateien aus release/.
-# Grund: Claude-Cloud-Sitzungen dürfen keine Releases anlegen, Tags pushen aber schon.
-# Danach wird der Upload-Tag wieder gelöscht – die Installer landen so nie dauerhaft in der Git-History.
+# Macht aus einem Upload-Branch (upload/2.6.6) ein GitHub-Release mit den Dateien aus release/.
+# Grund: Claude-Cloud-Sitzungen dürfen keine Releases anlegen, Branches pushen aber schon (Tags auch nicht).
+# Danach wird der Upload-Branch wieder gelöscht – die Installer landen so nie dauerhaft in der Git-History.
 name: Release
 on:
   push:
-    tags: ["upload-*"]
+    branches: ["upload/**"]
 permissions:
   contents: write
 jobs:
@@ -16,11 +16,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          V="${GITHUB_REF_NAME#upload-}"
+          V="${GITHUB_REF_NAME#upload/}"
           ls -la release
           gh release delete "v$V" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag 2>/dev/null || true
           gh release create "v$V" release/* --repo "$GITHUB_REPOSITORY" --target main --latest \
             --title "Erledigt $V" --notes "Windows: Erledigt-Setup-$V.exe · Mac (Apple-Chip): Erledigt-mac-arm64-$V.zip"
-      - name: Upload-Tag aufräumen
-        if: always()
-        run: git push origin ":refs/tags/${GITHUB_REF_NAME}"
+      - name: Upload-Branch aufräumen
+        if: success()
+        run: git push origin ":refs/heads/${GITHUB_REF_NAME}"
