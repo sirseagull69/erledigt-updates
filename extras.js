@@ -130,7 +130,7 @@ document.addEventListener("click", (e) => { if (e.target.closest("#feier")) { op
 async function forceUpdate(btn) {
   btn.disabled = true; btn.textContent = "Lädt …";
   try {
-    const files = ["./", "index.html", "app.css", "app.js", "shared.js", "extras.js", "scene.js", "vendor/supabase.js", "manifest.webmanifest", "sw.js"];
+    const files = ["./", "index.html", "app.css", "app.js", "shared.js", "extras.js", "scene.js", "v2.css", "v2.js", "vendor/supabase.js", "manifest.webmanifest", "sw.js"];
     await Promise.all(files.map((f) => fetch(f, { cache: "reload" }).catch(() => {})));
     if ("serviceWorker" in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
     if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
