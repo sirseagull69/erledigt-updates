@@ -1,0 +1,18 @@
+/* Nur Web-Version (Handy): Ergänzungen zur PC-Oberfläche. Wird von build/web.js als web.css ausgeliefert. */
+/* iPhone-Notch / Statusleiste: Kopf rutscht darunter, Inhalt bleibt frei */
+body.web.has-scene .hero .hello { padding-top: calc(46px + env(safe-area-inset-top, 0px)); }
+body.web .hero-icons { top: calc(46px + env(safe-area-inset-top, 0px)); }
+body.web { padding-bottom: env(safe-area-inset-bottom, 0px); }
+/* Lokale KI gibt es nur in der PC-App */
+body.web #ai-btn, body.web [data-ai-open] { display: none !important; }
+/* Kein Zoomen beim Antippen von Eingabefeldern (iOS zoomt unter 16px) */
+body.web input, body.web textarea, body.web select { font-size: max(16px, 1em); }
+/* Seitenleiste: Erfolge, Version, Konto erscheinen am PC erst beim Hinzeigen – am Handy gibt es kein Hinzeigen */
+body.web .nav-foot, body.web nav > .ver, body.web nav > .account { opacity: 1; }
+/* Schmale Handys: Icon-Leiste über Gruß und Titel statt daneben (sonst liegen sie übereinander) */
+@media (max-width: 600px) {
+  body.web .hero-icons { top: calc(12px + env(safe-area-inset-top, 0px)); right: 4px; gap: 4px; }
+  body.web .hero-btn { width: 40px; height: 40px; }
+  body.web.has-scene .hero .hello { padding-top: calc(68px + env(safe-area-inset-top, 0px)); }
+  body.web .hero h1 { font-size: 40px; }
+}
