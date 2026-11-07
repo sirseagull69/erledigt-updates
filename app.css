@@ -156,8 +156,8 @@ body { overflow-x: hidden; overscroll-behavior: none; -webkit-tap-highlight-colo
 button, .task, .chip, .tab { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
 /* ---------- Feierabend-Chip ---------- */
-.feier { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; border: 0; padding: 6px 11px; border-radius: 999px; font: 600 13px var(--font); color: var(--fg); background: var(--chip); }
-.feier.party { background: var(--accent); color: var(--on-party, #fff); }
+.feier { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; border: 0; padding: 0; background: none; font: 500 13px var(--font); color: var(--muted); opacity: .9; }
+.feier.party { color: var(--accent); }
 
 /* ---------- Himmel im Kopfbereich (Szene aus der Desktop-App) ---------- */
 .sc { display: none; }
@@ -167,8 +167,8 @@ body.has-scene .top small { color: var(--hfg2, var(--muted)); }
 body.has-scene .top h1 { color: var(--hfg, var(--fg)); text-shadow: 0 2px 18px rgb(0 0 0 / .18); }
 body.has-scene .icon-btn { background: rgb(10 14 30 / .28); color: #fff; box-shadow: none; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 body.has-scene .sync { margin-top: 17px; box-shadow: 0 0 0 2px rgb(0 0 0 / .2); }
-body.has-scene .feier { background: rgb(10 14 30 / .32); color: #fff; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
-body.has-scene .feier.party { background: var(--accent); color: var(--on-party, #fff); }
+body.has-scene .feier { color: var(--hfg2, #fff); text-shadow: 0 1px 8px rgb(0 0 0 / .35); }
+body.has-scene .feier.party { color: var(--hfg, #fff); }
 .feier svg { flex: none; }
 .sc svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .sc-move { will-change: transform; pointer-events: none; }
