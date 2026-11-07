@@ -323,6 +323,17 @@ function buildCity() {
 // ---------- Schlicht: nur Himmel und eine sanfte Hügelkante ----------
 function buildPlain() { const R = seeded(3); layer(ridgeD(ridgePts(11, 150, 12, .4, false))); fogBand(150, R); layer(ridgeD(ridgePts(23, 172, 8, .3, false))); L.frontPts = [[SW * .2, 196]]; L.lake = [SW * .2, SW * .2]; }
 
+// Im Browser-Tab (nicht Home-Bildschirm) liegt die Statusleiste über der Seite und wird eingefärbt:
+// dort die Himmelfarbe zeigen, damit der Übergang oben nahtlos ist. In der Home-Bildschirm-App läuft die Landschaft ohnehin drunter.
+const SC_STANDALONE = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let skyTop = null;
+function topBar() {
+  const on = !!skyTop && !SC_STANDALONE && document.body.classList.contains("has-scene") && window.scrollY < 40;
+  const c = on ? skyTop : getComputedStyle(document.body).backgroundColor;
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.getAttribute("content") !== c && m.setAttribute("content", c));
+  document.documentElement.style.backgroundColor = on ? skyTop : "";
+}
+addEventListener("scroll", () => topBar(), { passive: true });
 // ---------- Zeichnen ----------
 let cur = 720;
 function draw(m) {
@@ -331,6 +342,7 @@ function draw(m) {
   const ov = Math.min(1, W.cover * .7 + (W.rain || W.snow ? .25 : 0) + (W.storm ? .2 : 0)); // Bewölkung färbt den Himmel grau
   if (ov > 0) { const g = (a, b) => mix(a, b, night * .85); top = mix(top, g("#8E98A5", "#10121A"), ov * .8); mid = mix(mid, g("#B3BAC3", "#181A24"), ov * .75); hor = mix(hor, g("#C7CCD2", "#22242E"), ov * .6); }
   ["sc-s0", "sc-s1", "sc-s2"].forEach((id, i) => document.getElementById(id).setAttribute("stop-color", [top, mid, hor][i]));
+  skyTop = top; topBar();
   // Luftperspektive: hinten fast Horizontfarbe, vorne dunkel; tagsüber mit Jahreszeit-Ton
   const deep = mix(mix(top, "#05070F", .55), "#05070F", night * .5);
   layerEls.forEach((el, i) => {
@@ -600,7 +612,7 @@ function refresh() { if (!on || playing) return; const s = seasonTest || realSea
 let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); }, 250); }).observe(box); } catch {}
 sceneSync = () => {
   const want = !!design.w.scene;
-  document.body.classList.toggle("has-scene", want);
+  document.body.classList.toggle("has-scene", want); topBar();
   if (typeof syncTitlebar === "function") syncTitlebar();
   const pk = JSON.stringify(placeNow());
   if (want === on) { if (on) { refresh(); if (pk !== lastPk) { lastPk = pk; loadWeather(true).then(refresh); } } return; }

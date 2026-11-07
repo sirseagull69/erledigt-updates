@@ -83,7 +83,7 @@ function applyDesign() {
   el.textContent = `:root{${L}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${D}}}:root[data-theme="dark"]{${D}}`;
   if (design.theme === "light" || design.theme === "dark") document.documentElement.dataset.theme = design.theme; else delete document.documentElement.dataset.theme;
   // Statusleiste in der Hintergrundfarbe
-  requestAnimationFrame(() => { const bg = getComputedStyle(document.body).backgroundColor; document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", bg)); });
+  requestAnimationFrame(() => { if (typeof topBar === "function") return topBar(); const bg = getComputedStyle(document.body).backgroundColor; document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", bg)); });
 }
 
 // ---------- Einstellungen erweitern ----------
