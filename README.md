@@ -18,13 +18,14 @@ Persönliche To-do-App. Hier liegen nur die fertigen Installer (unter **Releases
 4. Mit „Registrieren“ ein eigenes Konto anlegen.
 
 ### Android installieren
-1. APK am Handy laden und antippen.
-2. Android fragt nach „Unbekannte Apps installieren“ → für den Browser erlauben → Installieren.
-3. Gleiches Konto wie am PC.
+1. Falls die alte Erledigt-App (vor November 2026) drauf ist: einmal deinstallieren – die neue hat einen anderen Signaturschlüssel.
+2. APK am Handy laden und antippen. Android fragt nach „Unbekannte Apps installieren“ → für den Browser erlauben → Installieren.
+3. Chrome muss installiert sein (die App läuft darin, nur ohne Leiste). Gleiches Konto wie am PC.
+4. Zahnrad → „Erinnerungen aufs Handy“ einschalten.
 
 ### iPhone
 1. Link oben in **Safari** öffnen und anmelden.
 2. Teilen-Knopf → **„Zum Home-Bildschirm“**. Dann gibt's ein Erledigt-Symbol wie bei einer App.
 
-Handy-Apps aktualisieren sich von selbst (sie laden immer die neueste Version).
+Handy-Apps aktualisieren sich von selbst (sie laden immer die neueste Version) – die Android-APK muss nie neu installiert werden.
 Danach kommen Updates auf beiden Systemen automatisch.
