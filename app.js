@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.7.3 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.7.4 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1230,6 +1230,7 @@ document.addEventListener("keydown", (e) => { if (fokus && e.key === "Escape") {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.7.4": ["Kein Hinweis-Fenster mehr beim Wechsel zwischen Arbeit und Privat", "Handy: gleiche Oberfläche wie am PC"],
   "2.7.3": ["Fokus-Modus: Taste F auf einer Aufgabe (oder ◎ im Detail) – die Landschaft füllt das ganze Fenster, dazu nur die eine Aufgabe und ein 25-Minuten-Timer mit Pause und +5 Min", "Esc oder „Fokus beenden“ bringt dich zurück"],
   "2.7.2": ["Erinnern vor dem Termin: Pünktlich, 5, 15, 30 oder 60 Min vorher (Einstellungen → Arbeitstag) – gilt auch fürs Handy", "Schalter „Große Landschaft“ in den Einstellungen: aus = schmales Band wie früher"],
   "2.7.1": ["Heller Modus: weicher, kurzer Übergang unter der Landschaft"],
@@ -1379,7 +1380,6 @@ function setAppMode(m) {
   const first = m === "privat" && !design.name;
   design.mode = m; designChanged(); lastTodayHtml = ""; lastDayHtml = null; renderDay(); updateHint();
   if (first) { openSetup(); return true; }
-  showBadge(m === "privat" ? "Privat-Modus" : "Arbeits-Modus", m === "privat" ? "Listen: Privat, Haushalt, Einkaufen, Termine" : "Listen: Arbeit, Privat, Projekte", "star");
   return false;
 }
 
