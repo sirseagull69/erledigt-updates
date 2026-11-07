@@ -1,8 +1,8 @@
-version: 2.6.5
+version: 2.6.6
 files:
-  - url: Erledigt-Setup-2.6.5.exe
-    sha512: VKrlDnl9gARhMXO0FBE0s+Cuhb+t1FpG32ohkRzR/2pBgBBT+fmbq91uHvnW2AhQNiyIRJ3fnTN2d8+YmB96bg==
-    size: 91805983
-path: Erledigt-Setup-2.6.5.exe
-sha512: VKrlDnl9gARhMXO0FBE0s+Cuhb+t1FpG32ohkRzR/2pBgBBT+fmbq91uHvnW2AhQNiyIRJ3fnTN2d8+YmB96bg==
-releaseDate: '2026-11-07T12:43:19.461Z'
+  - url: Erledigt-Setup-2.6.6.exe
+    sha512: djvn1ZFXPtR+K73wi02w2GP89/E/5iIPPC12V6ZIPXgdIpAE75sEoUA/TOCQPL5nOzkxd/O22OA9TRymBvt7LQ==
+    size: 91806099
+path: Erledigt-Setup-2.6.6.exe
+sha512: djvn1ZFXPtR+K73wi02w2GP89/E/5iIPPC12V6ZIPXgdIpAE75sEoUA/TOCQPL5nOzkxd/O22OA9TRymBvt7LQ==
+releaseDate: '2026-11-07T13:19:36.270Z'

@@ -1,8 +1,8 @@
-version: 2.6.5
+version: 2.6.6
 files:
-  - url: Erledigt-mac-arm64-2.6.5.zip
-    sha512: JqzO63RNNXt30+GLw50I6su+2cRu2+K7T8Ehb4oP0gK6a0avttQIv3j4XoJmepBI7U2Hc8ZgixEbL0q/5AlvVw==
-    size: 97747549
-path: Erledigt-mac-arm64-2.6.5.zip
-sha512: JqzO63RNNXt30+GLw50I6su+2cRu2+K7T8Ehb4oP0gK6a0avttQIv3j4XoJmepBI7U2Hc8ZgixEbL0q/5AlvVw==
-releaseDate: '2026-11-07T12:41:19.000Z'
+  - url: Erledigt-mac-arm64-2.6.6.zip
+    sha512: CvH2EFUclGRKXwsx8mS0Wvz1fRjs+beL8AmU5C+aGRKkF5Gf7iButaAe4LIHj91TYGCFUdrsDuyPEnBuUVh3kw==
+    size: 97747729
+path: Erledigt-mac-arm64-2.6.6.zip
+sha512: CvH2EFUclGRKXwsx8mS0Wvz1fRjs+beL8AmU5C+aGRKkF5Gf7iButaAe4LIHj91TYGCFUdrsDuyPEnBuUVh3kw==
+releaseDate: '2026-11-07T13:20:50.000Z'
