@@ -162,3 +162,61 @@ const WD_S = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"], MO_S = ["Jan", "Feb", "
 render = function () { render0(); if (loaded) { const n = new Date(), h = n.getHours(); $("greet").textContent = `${h < 11 ? "Guten Morgen" : h < 18 ? "Guten Tag" : "Guten Abend"} · ${WD_S[n.getDay()]}, ${n.getDate()}. ${MO_S[n.getMonth()]}`; feierUpdate(); if (typeof sceneSync === "function") sceneSync(); } };
 applyDesign();
 feierUpdate();
+
+// ---------- Konfetti wie am PC ----------
+const CONFETTI = ["#4F46E5", "#60A5FA", "#FB923C", "#34D399", "#F59E0B", "#EC4899"];
+function confettiPiece(i, big) {
+  const s = document.createElement("span"); s.className = "confetti";
+  const size = big ? 9 + Math.random() * 9 : 6 + Math.random() * 5;
+  s.style.width = size + "px"; s.style.height = (Math.random() < .5 ? size * 1.7 : size) + "px";
+  s.style.background = CONFETTI[i % CONFETTI.length];
+  if (Math.random() < .35) s.style.borderRadius = "50%";
+  document.body.appendChild(s); return s;
+}
+function burst(cx, cy, n, power) {
+  if (reduce.matches) return;
+  const live = document.querySelectorAll(".confetti");
+  if (live.length > 300) for (let i = 0; i < live.length - 200; i++) live[i].remove();
+  const big = power > 1.5;
+  for (let i = 0; i < n * (big ? 1.5 : 1.3); i++) {
+    const s = confettiPiece(i, big);
+    const ang = -Math.PI / 2 + (Math.random() - .5) * Math.PI * (big ? 1.6 : 2);
+    const dist = (big ? 90 + Math.random() * 160 : 35 + Math.random() * 55) * Math.min(power, 2.5);
+    const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist, rot = (Math.random() - .5) * 1080;
+    s.animate([
+      { transform: `translate(${cx}px, ${cy}px) rotate(0) scale(.6)`, opacity: 1 },
+      { transform: `translate(${cx + dx}px, ${cy + dy}px) rotate(${rot / 2}deg) scale(1)`, opacity: 1, offset: .45 },
+      { transform: `translate(${cx + dx * 1.3}px, ${cy + dy + (big ? 380 : 120)}px) rotate(${rot}deg) scale(.9)`, opacity: 0 },
+    ], { duration: big ? 1900 + Math.random() * 900 : 1000 + Math.random() * 400, easing: "cubic-bezier(.15,.7,.35,1)" }).finished.then(() => s.remove(), () => s.remove());
+  }
+  if (power >= 3) confettiRain(Math.round(n * 1.6));
+}
+function confettiRain(n) {
+  const W = innerWidth, H = innerHeight;
+  for (let i = 0; i < n; i++) {
+    const s = confettiPiece(i, true);
+    const x = Math.random() * W, sway = (Math.random() - .5) * 220, rot = (Math.random() - .5) * 1440;
+    s.animate([
+      { transform: `translate(${x}px, -30px) rotate(0)`, opacity: 1 },
+      { transform: `translate(${x + sway}px, ${H * .55}px) rotate(${rot / 2}deg)`, opacity: 1, offset: .55 },
+      { transform: `translate(${x - sway / 2}px, ${H + 40}px) rotate(${rot}deg)`, opacity: .9 },
+    ], { duration: 2400 + Math.random() * 1800, delay: Math.random() * 700, easing: "linear", fill: "backwards" }).finished.then(() => s.remove(), () => s.remove());
+  }
+}
+let lastTap = null;
+document.addEventListener("pointerdown", (e) => { lastTap = { x: e.clientX, y: e.clientY, t: Date.now() }; }, true);
+const openNow = () => items.filter((t) => !t.done && !t.archived && MODE_LISTS[mode].includes(t.list)).length;
+const toggleDone0 = toggleDone;
+toggleDone = function (id) {
+  const t = items.find((x) => x.id === id), finishing = t && !t.done;
+  const el = document.querySelector(`[data-check="${id}"]`), r = el?.getBoundingClientRect();
+  const before = openNow();
+  toggleDone0(id);
+  if (!finishing) return;
+  let cx = innerWidth / 2, cy = innerHeight / 3;
+  if (r && r.width && r.bottom > 0 && r.top < innerHeight && r.left < innerWidth && r.right > 0) { cx = r.left + r.width / 2; cy = r.top + r.height / 2; }
+  else if (lastTap && Date.now() - lastTap.t < 2000) { cx = lastTap.x; cy = lastTap.y; }
+  try { navigator.vibrate?.(18); } catch {}
+  if (before > 0 && openNow() === 0) burst(cx, cy, 60, 4); // alles erledigt: großes Konfetti mit Regen
+  else burst(cx, cy, 18, 1.3);
+};
