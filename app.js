@@ -44,8 +44,8 @@ const busy = new Set();
 const endDay = (t) => t.until || t.due;
 async function write(id, fn) {
   busy.add(id);
-  try { const { error } = await fn(); if (error) throw error; setSync(true); }
-  catch (err) { setSync(false); toast("Konnte nicht speichern – " + (/fetch|network/i.test(err.message) ? "keine Verbindung" : err.message)); setTimeout(fetchAll, 1500); }
+  try { const { error } = await fn(); if (error) throw error; setSync(true); return true; }
+  catch (err) { setSync(false); toast("Konnte nicht speichern – " + (/fetch|network/i.test(err.message) ? "keine Verbindung" : err.message)); setTimeout(fetchAll, 1500); return false; }
   finally { setTimeout(() => busy.delete(id), 1500); }
 }
 function applyLocal(id, body) {
@@ -65,7 +65,7 @@ function patch(id, p) {
   const it = items.find((x) => x.id === id);
   if ("due" in p && !("until" in p) && it?.until) p = { ...p, until: p.due && it.due ? iso(addDays(parseIso(p.due), Math.round((parseIso(it.until) - parseIso(it.due)) / 864e5))) : null };
   applyLocal(id, p);
-  write(id, () => sb.from("todos").update(toRow(p)).eq("id", id));
+  return write(id, () => sb.from("todos").update(toRow(p)).eq("id", id));
 }
 let undoBuf = null;
 function removeItem(id) {
@@ -75,17 +75,18 @@ function removeItem(id) {
   write(id, () => sb.from("todos").delete().eq("id", id));
   toast(`„${it.title}“ gelöscht`, true);
 }
-function toggleDone(id) {
+async function toggleDone(id) {
   const it = items.find((x) => x.id === id); if (!it) return;
-  if (!it.done && it.repeat) { // wiederkehrend: nächsten Termin anlegen (wie am PC)
-    const base = addDays(new Date(Math.max(it.due ? parseIso(it.due) : 0, todayD())), 1);
-    const next = iso(nextOcc(it.repeat, base)), nid = newId();
-    const doc = { title: it.title, due: next, time: it.time || null, timeEnd: it.timeEnd || null, repeat: it.repeat, prio: it.prio, list: it.list, notes: it.notes || "", checklist: (it.checklist || []).map((c) => ({ ...c, done: false })), done: false, doneAt: null, createdAt: Date.now() };
-    applyLocal(nid, doc); write(nid, () => sb.from("todos").upsert({ id: nid, ...toRow(doc), attachments: [] }));
-    toast(`Kommt wieder: ${dueLabel(next)}`);
-  }
   if (navigator.vibrate) navigator.vibrate(12);
-  patch(id, { done: !it.done, doneAt: it.done ? null : Date.now() });
+  const saved = patch(id, { done: !it.done, doneAt: it.done ? null : Date.now() });
+  if (it.done || !it.repeat) return;
+  // wiederkehrend: Folgetermin erst anlegen, wenn „erledigt“ wirklich gespeichert ist (sonst gäbe es Doppelte)
+  const base = addDays(new Date(Math.max(it.due ? parseIso(it.due) : 0, todayD())), 1);
+  const next = iso(nextOcc(it.repeat, base)), nid = newId();
+  const doc = { title: it.title, due: next, time: it.time || null, timeEnd: it.timeEnd || null, repeat: it.repeat, prio: it.prio, list: it.list, notes: it.notes || "", checklist: (it.checklist || []).map((c) => ({ ...c, done: false })), done: false, doneAt: null, createdAt: Date.now() };
+  if (!(await saved)) return;
+  applyLocal(nid, doc); write(nid, () => sb.from("todos").upsert({ id: nid, ...toRow(doc), attachments: [] }));
+  toast(`Kommt wieder: ${dueLabel(next)}`);
 }
 async function fetchAll() {
   const { data, error } = await sb.from("todos").select("*").order("created_at");
@@ -150,15 +151,17 @@ function render() {
   const cnt = (id) => items.filter((t) => !t.done && !t.archived && (id === "alle" ? MODE_LISTS[mode].includes(t.list) : t.list === id)).length;
   $("chips").innerHTML = [{ id: "alle", name: "Alle", dot: "var(--fg)" }, ...shownLists()].map((l) => `<button type="button" class="chip" data-list="${l.id}" aria-pressed="${list === l.id}" style="--c:${l.dot}">${l.id === "alle" ? "" : "<i></i>"}${l.name}<b>${cnt(l.id) || ""}</b></button>`).join("");
   $("view-list").hidden = tab !== "list"; $("view-cal").hidden = tab !== "cal";
-  document.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
   if (tab === "list") renderList(); else renderCal();
+  $("cal-btn").setAttribute("aria-pressed", String(tab === "cal"));
+  const sd = parseIso(calSel);
+  $("add-in").placeholder = tab === "cal" ? `Was ist am ${sd.getDate()}.${sd.getMonth() + 1}.?` : "Was steht an?";
 }
 function renderList() {
   const all = inList(), open = all.filter((t) => !t.done).sort(sortT), today = iso(todayD());
   const doneToday = all.filter((t) => t.done && t.doneAt && iso(new Date(t.doneAt)) === today);
   let html = "";
   SECTIONS.forEach((name, i) => { const sec = open.filter((t) => sectionOf(t) === i); if (sec.length) html += `<div class="sec${i === 0 ? " late" : ""}">${name} <span>${sec.length}</span></div>` + sec.map(taskHtml).join(""); });
-  if (!open.length) html = `<div class="empty"><b>${doneToday.length ? "Alles erledigt 🎉" : "Nichts zu tun"}</b>Tipp unten auf <b style="display:inline;font-size:inherit">+</b>, um etwas einzutragen.</div>`;
+  if (!open.length) html = `<div class="empty"><b>${doneToday.length ? "Alles erledigt 🎉" : "Nichts zu tun"}</b>Unten eintippen, Enter – fertig.</div>`;
   if (doneToday.length) html += `<details class="done-box"${store.get("em-done-open", false) ? " open" : ""}><summary class="sec">Heute erledigt <span>${doneToday.length}</span></summary>${doneToday.map(taskHtml).join("")}</details>`;
   $("view-list").innerHTML = html;
 }
@@ -175,57 +178,78 @@ function renderCal() {
   const sel = onDay(calSel).sort(sortT), sd = parseIso(calSel);
   $("view-cal").innerHTML = `<div class="cal-nav"><b>${MONTHS[m]} ${first.getFullYear()}</b><button type="button" data-cal="-1" aria-label="Voriger Monat">‹</button><button type="button" data-cal="0">Heute</button><button type="button" data-cal="1" aria-label="Nächster Monat">›</button></div>
     <div class="cal">${cells}</div>
-    <div class="day-head"><b>${WD[sd.getDay()]}, ${sd.getDate()}. ${MONTHS[sd.getMonth()]}</b>${holidayOf(calSel) ? `<small>${holidayOf(calSel).name}</small>` : ""}<span class="hint">+ trägt für diesen Tag ein</span></div>
+    <div class="day-head"><b>${WD[sd.getDay()]}, ${sd.getDate()}. ${MONTHS[sd.getMonth()]}</b>${holidayOf(calSel) ? `<small>${holidayOf(calSel).name}</small>` : ""}</div>
     ${sel.length ? sel.map(taskHtml).join("") : '<div class="empty" style="padding:20px">Nichts an diesem Tag.</div>'}`;
 }
 
-// ---------- Neu ----------
+// ---------- Neu: Eingabezeile unten (wie im Messenger) ----------
 let draft = { list: null, prio: null, forDay: null };
-function openAdd(forDay) {
-  draft = { list: null, prio: null, forDay: forDay || null };
-  $("add-wrap").hidden = false; $("add-in").value = ""; addPreview();
-  setTimeout(() => $("add-in").focus(), 60);
-}
+const comp = $("composer"), inp = $("add-in");
+const FLAG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M5 21V4h10l1 2h4v10h-7l-1-2H7v7z"/></svg>';
 function addParsed() {
-  const txt = $("add-in").value.trim(); if (!txt) return null;
+  const txt = inp.value.trim(); if (!txt) return null;
   const p = parseInput(txt);
   if (draft.forDay && !p.due) p.due = draft.forDay;
   return { ...p, title: p.title || txt, list: draft.list || p.list || (draft.forDay && mode === "privat" ? "termine" : defList()), prio: draft.prio || p.prio || "mittel" };
 }
-const PRIO_UI = [["hoch", "Hoch", "var(--danger)"], ["mittel", "Mittel", "#E8A33D"], ["niedrig", "Niedrig", "var(--faint)"]];
 function addPreview() {
   const p = addParsed();
-  const bits = p ? [p.due ? dueText({ due: p.due, until: p.until, time: p.time, timeEnd: p.timeEnd }) : "", p.repeat ? "wiederholt sich" : "", p.list && !draft.list && p.list !== defList() ? listById[p.list]?.name : ""].filter(Boolean) : [];
-  $("add-prev").innerHTML = bits.length ? "Erkannt: " + bits.map((b) => `<code>${esc(b)}</code>`).join("") : `z. B. <code>morgen</code> <code>Fr 14 Uhr</code> <code>9-17 Uhr</code>`;
-  $("add-prev").classList.toggle("hit", bits.length > 0);
-  const curList = p?.list || draft.list || defList(), curPrio = draft.prio || p?.prio || "mittel";
-  $("add-prio").innerHTML = PRIO_UI.map(([k, n, c]) => `<button type="button" data-ap="${k}" aria-pressed="${curPrio === k}"><i class="dot" style="background:${c}"></i>${n}</button>`).join("");
+  const bits = p ? [p.due ? dueText({ due: p.due, until: p.until, time: p.time, timeEnd: p.timeEnd }) : "", p.repeat ? "wiederholt sich" : ""].filter(Boolean) : [];
+  $("add-prev").textContent = bits.join(" · ");
+  $("add-prev").classList.toggle("on", bits.length > 0);
   const dueK = p?.due || "", t0 = iso(todayD()), t1 = iso(addDays(todayD(), 1));
-  $("add-quick").innerHTML = [["heute", "Heute", t0], ["morgen", "Morgen", t1]].map(([k, l, d]) => `<button type="button" data-q="${k}" aria-pressed="${dueK === d}">${l}</button>`).join("") + '<span class="q-sep"></span>'
-    + shownLists().map((l) => `<button type="button" data-ql="${l.id}" aria-pressed="${curList === l.id}"><i class="dot" style="background:${l.dot}"></i>${l.name}</button>`).join("");
+  const curList = p?.list || draft.list || defList(), hoch = (draft.prio || p?.prio) === "hoch", L = listById[curList];
+  $("add-quick").innerHTML = `<button type="button" data-q="heute" aria-pressed="${dueK === t0}">Heute</button><button type="button" data-q="morgen" aria-pressed="${dueK === t1}">Morgen</button><span class="sep"></span>`
+    + `<button type="button" data-flag aria-pressed="${hoch}"${hoch ? ' class="flag"' : ""}>${FLAG}Wichtig</button><span class="sep"></span>`
+    + `<button type="button" data-cycle aria-pressed="false"><i class="dot" style="background:${L.dot}"></i>${L.name}<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5 5 5-5"/></svg></button>`;
   $("add-save").disabled = !p;
 }
 function saveAdd() {
-  const p = addParsed(); if (!p) { closeSheet($("add-wrap")); return; }
-  addItem(p); closeSheet($("add-wrap"));
-  if (p.due && tab === "cal") calSel = p.due;
+  const p = addParsed(); if (!p) return;
+  addItem(p);
+  if (p.due && tab === "cal") { calSel = p.due; render(); }
+  inp.value = ""; draft = { list: draft.list, prio: null, forDay: tab === "cal" ? calSel : null };
+  addPreview(); inp.focus();
 }
-$("add-btn").addEventListener("click", () => openAdd(tab === "cal" ? calSel : null));
-$("add-in").addEventListener("input", addPreview);
-$("add-in").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveAdd(); } });
+// Listen-Auswahl: kleines Menü über der Leiste
+function listMenu(close) {
+  let m = $("c-menu");
+  if (m || close) { m?.remove(); return; }
+  const cur = addParsed()?.list || draft.list || defList();
+  m = document.createElement("div"); m.id = "c-menu"; m.className = "c-menu";
+  m.innerHTML = shownLists().map((l) => `<button type="button" data-pick="${l.id}" aria-pressed="${cur === l.id}"><i style="background:${l.dot}"></i>${l.name}</button>`).join("");
+  comp.appendChild(m);
+}
+$("add-save").addEventListener("pointerdown", (e) => e.preventDefault()); // Tastatur bleibt offen
 $("add-save").addEventListener("click", saveAdd);
-$("add-cancel").addEventListener("click", () => closeSheet($("add-wrap")));
-$("add-prio").addEventListener("click", (e) => { const b = e.target.closest("[data-ap]"); if (!b) return; draft.prio = b.dataset.ap; addPreview(); $("add-in").focus(); });
+inp.addEventListener("input", addPreview);
+inp.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveAdd(); } });
+inp.addEventListener("focus", () => { draft.forDay = tab === "cal" ? calSel : null; comp.classList.add("open"); addPreview(); });
+inp.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== inp) { comp.classList.remove("open"); listMenu(true); } }, 120));
+$("add-quick").addEventListener("pointerdown", (e) => e.preventDefault()); // Tippen auf Optionen schließt die Tastatur nicht
 $("add-quick").addEventListener("click", (e) => {
-  const q = e.target.closest("[data-q]"), ql = e.target.closest("[data-ql]");
+  const q = e.target.closest("[data-q]");
   if (q) {
-    const had = new RegExp("\\b" + q.dataset.q + "\\b", "i").test($("add-in").value);
-    const v = $("add-in").value.replace(/\s*\b(heute|morgen)\b/gi, "").trim();
-    $("add-in").value = had ? v : (v + " " + q.dataset.q).trim();
+    const had = new RegExp("\\b" + q.dataset.q + "\\b", "i").test(inp.value);
+    const v = inp.value.replace(/\s*\b(heute|morgen)\b/gi, "").trim();
+    inp.value = had ? v : (v + " " + q.dataset.q).trim();
+    addPreview(); inp.focus();
   }
-  if (ql) draft.list = ql.dataset.ql;
-  addPreview(); $("add-in").focus();
+  if (e.target.closest("[data-flag]")) { draft.prio = draft.prio === "hoch" ? "mittel" : "hoch"; addPreview(); }
+  if (e.target.closest("[data-cycle]")) listMenu();
 });
+comp.addEventListener("pointerdown", (e) => { if (e.target.closest(".c-menu")) e.preventDefault(); });
+comp.addEventListener("click", (e) => { const b = e.target.closest("[data-pick]"); if (!b) return; draft.list = b.dataset.pick; listMenu(true); addPreview(); inp.focus(); });
+// Oben auf eine Liste tippen, während man schreibt: Liste fürs Eintragen übernehmen, Tastatur bleibt offen
+document.addEventListener("pointerdown", (e) => {
+  const chip = e.target.closest("#chips [data-list]");
+  if (chip && document.activeElement === inp) { e.preventDefault(); return; }
+  if (!comp.contains(e.target)) { listMenu(true); if (document.activeElement === inp) inp.blur(); }
+});
+document.addEventListener("click", (e) => { const chip = e.target.closest("#chips [data-list]"); if (chip && comp.classList.contains("open")) { draft.list = chip.dataset.list === "alle" ? null : chip.dataset.list; setTimeout(() => { addPreview(); inp.focus(); }, 0); } }, true);
+// Kalender-Knopf im Kopf
+$("cal-btn").addEventListener("click", () => { tab = tab === "cal" ? "list" : "cal"; render(); });
+addPreview();
 
 // Sheets schließen mit Animation
 function closeSheet(w) {
@@ -277,7 +301,7 @@ function openSet() {
   $("set").innerHTML = `<h2 style="margin:4px 0">Einstellungen</h2>
     <div class="set-row"><span>Angemeldet als</span><b style="overflow:hidden;text-overflow:ellipsis">${esc(session?.user?.email || "")}</b></div>
     ${/ErledigtAndroid/.test(navigator.userAgent) ? "" : `<div class="set-row"><span>Auf den Home-Bildschirm</span><span class="muted" style="text-align:right;font-size:14px">iPhone: Teilen → „Zum Home-Bildschirm“</span></div>`}
-    <div class="set-row"><span>Version</span><span class="muted">mobil 3.5${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
+    <div class="set-row"><span>Version</span><span class="muted">mobil ${APP_VERSION}${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
     <button type="button" class="btn danger wide" id="logout">Abmelden</button>`;
   $("set-wrap").hidden = false;
 }
@@ -346,7 +370,6 @@ document.addEventListener("click", (e) => {
   const op = e.target.closest("[data-open]"); if (op && !swiped) { openDet(op.dataset.open); return; }
   const md = e.target.closest("[data-mode]"); if (md) { mode = md.dataset.mode; store.set("em-mode", mode); list = "alle"; render(); return; }
   const li = e.target.closest("[data-list]"); if (li) { list = li.dataset.list; render(); return; }
-  const tb = e.target.closest("[data-tab]"); if (tb) { tab = tb.dataset.tab; render(); window.scrollTo({ top: 0 }); return; }
   const cn = e.target.closest("[data-cal]"); if (cn) { calOff = cn.dataset.cal === "0" ? 0 : calOff + +cn.dataset.cal; if (cn.dataset.cal === "0") calSel = iso(todayD()); render(); return; }
   const dy = e.target.closest("[data-day]"); if (dy) { calSel = dy.dataset.day; render(); }
 });

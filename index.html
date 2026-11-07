@@ -16,7 +16,6 @@
 <script>try{var t=JSON.parse(localStorage.getItem("em-design")||"{}").theme;if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="stylesheet" href="app.css">
-<link rel="stylesheet" href="v2.css">
 <script src="vendor/supabase.js"></script>
 </head>
 <body>
@@ -61,11 +60,8 @@
       <button type="button" class="c-send" id="add-save" aria-label="Eintragen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
     </div>
     <div class="c-tools" id="add-quick"></div>
-    <div hidden><div id="add-prio"></div><button type="button" id="add-btn"></button><button type="button" id="add-cancel"></button></div>
   </div>
 </main>
-
-<div id="add-wrap" hidden></div>
 
 <!-- Details -->
 <div class="sheet-wrap" id="det-wrap" hidden>
@@ -100,10 +96,10 @@
 
 <div class="toast" id="toast" hidden><span id="toast-txt"></span><button type="button" id="toast-undo">Rückgängig</button></div>
 
+<script src="version.js"></script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
 <script src="extras.js"></script>
 <script src="scene.js"></script>
-<script src="v2.js"></script>
 </body>
 </html>

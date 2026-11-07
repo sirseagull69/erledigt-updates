@@ -1,5 +1,5 @@
 // Automatisch aus der Desktop-App übernommen (tools/shared.py) – nicht von Hand ändern.
-const WEEKDAYS = { montag: 1, mo: 1, dienstag: 2, di: 2, mittwoch: 3, mi: 3, donnerstag: 4, freitag: 5, fr: 5, samstag: 6, sonntag: 0 };
+const WEEKDAYS = { montag: 1, mo: 1, dienstag: 2, di: 2, mittwoch: 3, mi: 3, donnerstag: 4, do: 4, freitag: 5, fr: 5, samstag: 6, sa: 6, sonntag: 0 }; // „so“ fehlt absichtlich – sonst würde „so schnell wie möglich“ zum Sonntag
 const WD_PLURAL = { sonntags: 0, montags: 1, dienstags: 2, mittwochs: 3, donnerstags: 4, freitags: 5, samstags: 6 };
 function matchRule(rule, d) {
   if (rule === "daily") return true;
