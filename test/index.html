@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Erledigt</title>
+<meta name="description" content="Erledigt – deine Aufgaben und Termine, synchron mit dem PC.">
+<meta name="theme-color" content="#14121A" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F6F4F1" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Erledigt">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="icon" href="../icons/icon-192.png">
+<script>try{var t=JSON.parse(localStorage.getItem("em-design")||"{}").theme;if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="stylesheet" href="../app.css">
+<link rel="stylesheet" href="v2.css">
+<script src="../vendor/supabase.js"></script>
+</head>
+<body>
+<!-- Anmeldung -->
+<section id="auth" class="auth" hidden>
+  <div class="auth-box">
+    <img src="../icons/icon-192.png" alt="" class="auth-logo">
+    <h1 id="auth-title">Anmelden</h1>
+    <p class="muted">Gleiches Konto wie in der Erledigt-App am PC.</p>
+    <form id="auth-form">
+      <label>E-Mail<input id="auth-email" type="email" autocomplete="email" required></label>
+      <label>Passwort<input id="auth-pass" type="password" autocomplete="current-password" required minlength="6"></label>
+      <button type="submit" class="btn primary" id="auth-go">Anmelden</button>
+    </form>
+    <p id="auth-msg" class="auth-msg" hidden></p>
+    <button type="button" class="link" id="auth-switch">Noch kein Konto? Konto erstellen</button>
+  </div>
+</section>
+
+<!-- App -->
+<main id="app" hidden>
+  <header class="top">
+    <div class="top-txt"><small id="greet">Guten Tag</small><h1 id="title">Aufgaben</h1></div>
+    <span id="sync" class="sync" title="Synchronisiert"></span>
+    <button type="button" class="icon-btn" id="cal-btn" aria-label="Kalender"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></button>
+    <button type="button" class="icon-btn" id="settings-btn" aria-label="Einstellungen"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </header>
+
+  <div class="modes" role="group" aria-label="Modus">
+    <button type="button" data-mode="arbeit">Arbeit</button><button type="button" data-mode="privat">Privat</button>
+  </div>
+  <div class="chips" id="chips" role="group" aria-label="Listen"></div>
+
+  <section id="view-list" class="view"></section>
+  <section id="view-cal" class="view" hidden></section>
+
+  <div class="composer" id="composer">
+    <div class="c-prev" id="add-prev"></div>
+    <div class="c-row">
+      <input id="add-in" placeholder="Neue Aufgabe …" enterkeyhint="send" autocomplete="off" autocapitalize="sentences">
+      <button type="button" class="c-send" id="add-save" aria-label="Eintragen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div>
+    <div class="c-tools" id="add-quick"></div>
+    <div hidden><div id="add-prio"></div><button type="button" id="add-btn"></button><button type="button" id="add-cancel"></button></div>
+  </div>
+</main>
+
+<div id="add-wrap" hidden></div>
+
+<!-- Details -->
+<div class="sheet-wrap" id="det-wrap" hidden>
+  <div class="sheet tall" role="dialog" aria-label="Details">
+    <div class="grab"></div>
+    <div id="det"></div>
+  </div>
+</div>
+
+<!-- Einstellungen -->
+<div class="sheet-wrap" id="set-wrap" hidden>
+  <div class="sheet" role="dialog" aria-label="Einstellungen">
+    <div class="grab"></div>
+    <div id="set"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden><span id="toast-txt"></span><button type="button" id="toast-undo">Rückgängig</button></div>
+
+<script src="../shared.js"></script>
+<script src="../app.js"></script>
+<script src="../extras.js"></script>
+<script src="../scene.js"></script>
+<script src="v2.js"></script>
+</body>
+</html>
