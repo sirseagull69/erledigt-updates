@@ -55,7 +55,16 @@ let L = {}, layerEls = [], leafEls = [];
 // Landschaften: wald (Schwarzwald), alpen, kueste, stadt, schlicht – Auswahl im Design-Menü
 const THEMES = ["wald", "alpen", "kueste", "stadt", "schlicht"];
 const theme = () => { try { return THEMES.includes(design.scene) ? design.scene : "wald"; } catch { return "wald"; } };
-const LAYERS_ALP = [[11, 112, 64, 1, 0], [23, 132, 50, 1.2, 0], [37, 152, 26, 1.6, .3], [51, 172, 16, 1.8, .5], [64, 194, 10, 2, .68]];
+const LAYERS_ALP = [[11, 104, 92, 2.4, 0], [23, 128, 66, 2, 0], [37, 158, 20, 1.4, .3], [51, 176, 12, 1.6, .55], [64, 196, 8, 1.8, .72]];
+// Alpen: schroffe, hohe Felsgipfel statt sanfter Schwarzwaldkuppen
+function alpPts(seed, base, amp, rough) {
+  const R = seeded(seed), o = [R() * 9, R() * 9, R() * 9], pts = [];
+  for (let x = -10; x <= SW + 10; x += 4) {
+    const pk = Math.pow(1 - Math.abs(Math.sin(x / 78 + o[0])), 3.2), pk2 = Math.pow(1 - Math.abs(Math.sin(x / 41 + o[1])), 4);
+    pts.push([x, base - amp * (.18 + .62 * pk + .22 * pk2 + .08 * Math.sin(x / 19 + o[2])) - rough * (R() - .5) * 2.4]);
+  }
+  return pts;
+}
 let TH = "wald";
 function build() {
   svg.innerHTML = ""; mv.innerHTML = ""; layerEls = []; L.crownPts = [];
@@ -109,9 +118,10 @@ function build() {
   else if (TH === "schlicht") buildPlain();
   else (TH === "alpen" ? LAYERS_ALP : LAYERS).forEach(([seed, base, amp, rough, pines], i) => {
     const alp = TH === "alpen";
-    const pts = ridgePts(seed, base, amp, rough, alp ? i <= 2 : i <= 1);
+    const pts = alp && i <= 1 ? alpPts(seed, base, amp, rough) : ridgePts(seed, base, amp, rough, alp ? i <= 2 : i <= 1);
     if (i === 4) pts.forEach((q) => { if (q[0] > LAKE[0] - 30 && q[0] < LAKE[1] + 30) q[1] += 14 * Math.sin(Math.PI * Math.max(0, Math.min(1, (q[0] - LAKE[0] + 30) / (LAKE[1] - LAKE[0] + 60)))); });
     let d = `M-10 210 L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} 210Z`;
+    if (alp && i === 1) { const right = pts.filter((t) => t[0] > SW * .55 && t[0] < SW * .9); L.alpTop = right.reduce((m, t) => (t[1] < m[1] ? t : m), right[0]); }
     const R = seeded(seed * 3), crowns = [];
     const free = (x) => !(i === 3 && Math.abs(x - HOUSE) < 34) && !(i === 4 && x > LAKE[0] - 10 && x < LAKE[1] + 10);
     if (pines) { // Weißtannen (gestuft, schmal) + Laubbäume dazwischen
@@ -119,7 +129,7 @@ function build() {
         const [x, y] = pts[j]; if (!free(x)) continue;
         const r = R();
         if (r < pines * .62) { const h = (7 + R() * 11) * (1 + (i - 2) * .22), w = h * .26; d += ` M${x - w} ${y + 2} L${x - w * .5} ${y - h * .42} L${x - w * .78} ${y - h * .42} L${x - w * .32} ${y - h * .72} L${x - w * .55} ${y - h * .72} L${x} ${y - h} L${x + w * .55} ${y - h * .72} L${x + w * .32} ${y - h * .72} L${x + w * .78} ${y - h * .42} L${x + w * .5} ${y - h * .42} L${x + w} ${y + 2}Z`; }
-        else if (i >= 3 && r < pines * .62 + .2) { const h = (8 + R() * 9) * (1 + (i - 2) * .22); d += ` M${x - .6} ${y + 2} V${y - h * .45} H${x + .6} V${y + 2}Z`; crowns.push([x, y - h * .62, h, Math.floor(R() * 5), R()]); }
+        else if (i >= 3 && !alp && r < pines * .62 + .2) { const h = (8 + R() * 9) * (1 + (i - 2) * .22); d += ` M${x - .6} ${y + 2} V${y - h * .45} H${x + .6} V${y + 2}Z`; crowns.push([x, y - h * .62, h, Math.floor(R() * 5), R()]); }
       }
     }
     if (i === 3 && !alp) { // Schwarzwaldhaus: riesiges Walmdach, fast bis zum Boden
@@ -142,9 +152,19 @@ function build() {
       leafEls.push([c, i, ci]); L.crownPts.push([x, y, h, i, ci]); });
     if ((se.snow || alp) && i <= 1) {
       const gr = mk("linearGradient", { id: "sc-snow" + i, x1: 0, y1: 0, x2: 0, y2: 1, gradientUnits: "userSpaceOnUse" }, defs);
-      gr.setAttribute("y1", base - amp * 1.4); gr.setAttribute("y2", base + 6);
-      mk("stop", { offset: 0, "stop-color": "#F4F7FB" }, gr); mk("stop", { offset: .38, "stop-color": "#E6ECF3" }, gr); mk("stop", { offset: .62, class: "snowbase" }, gr);
+      gr.setAttribute("y1", base - amp * (alp ? 1.1 : 1.4)); gr.setAttribute("y2", base + 6);
+      mk("stop", { offset: 0, "stop-color": "#F4F7FB" }, gr); mk("stop", { offset: alp ? .3 : .38, "stop-color": "#E6ECF3" }, gr); mk("stop", { offset: alp ? .42 : .62, class: "snowbase" }, gr);
       p.dataset.snow = i;
+    }
+    if (i === 3 && alp) { // Almhütte mit flachem Satteldach + Seilbahn hoch zum Gipfel
+      const q = pts.find((t) => t[0] >= SW * .3), x = q[0], y = q[1] + 5;
+      p.setAttribute("d", p.getAttribute("d") + ` M${x - 11} ${y + 3} V${y - 7} L${x - 14} ${y - 6} L${x} ${y - 15} L${x + 14} ${y - 6} L${x + 11} ${y - 7} V${y + 3}Z`);
+      [[-6, -3], [0, -3], [6, -3]].forEach(([dx, dy], j) => { const w = mk("rect", { x: x + dx - 1.4, y: y + dy - 1.2, width: 2.8, height: 2.4, fill: "#FFC96E" }); L.lights.push([w, j * .05]); });
+      const top = L.alpTop || [SW * .72, 40], a = [SW * .12, 170];
+      mk("path", { d: `M${a[0]} ${a[1]} Q${(a[0] + top[0]) / 2} ${(a[1] + top[1]) / 2 + 18} ${top[0]} ${top[1]}`, stroke: "#2A2D35", "stroke-width": .5, fill: "none", opacity: .6 });
+      const gon = mk("g", {}, mv); mk("rect", { x: -3, y: 0, width: 6, height: 4.2, rx: 1, fill: "#C8473E" }, gon); mk("path", { d: "M0 0 V-3", stroke: "#2A2D35", "stroke-width": .5 }, gon);
+      const kf = []; for (let k = 0; k <= 20; k++) { const t = k / 20, cx = (1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * ((a[0] + top[0]) / 2) + t * t * top[0], cy = (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * ((a[1] + top[1]) / 2 + 18) + t * t * top[1]; kf.push({ transform: `translate(${cx}px, ${cy + 3}px)` }); }
+      gon.animate(kf, { duration: 70000, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
     }
     if (i === 3 && !alp) { // Fenster + Kaminrauch am Schwarzwaldhaus
       const [x, y] = L.house;
@@ -245,12 +265,13 @@ function draw(m) {
     const k = .22 + i * .19;
     let c = mix(hor, deep, k);
     c = mix(c, se.tint, se.k * 1.8 * d * (.3 + i / 5.5));
+    if (TH === "alpen") { if (i <= 1) c = mix(c, "#5E636E", .35 * (.4 + .6 * d)); else if (i === 2) c = mix(c, "#5F8F45", .32 * d); }
     if (el.dataset.snow) { el.setAttribute("fill", `url(#sc-snow${el.dataset.snow})`); const st = document.querySelector(`#sc-snow${el.dataset.snow} .snowbase`); st.setAttribute("stop-color", c); document.querySelectorAll(`#sc-snow${el.dataset.snow} stop`).forEach((x, j) => { if (j < 2) x.setAttribute("stop-color", mix(["#F4F7FB", "#E6ECF3"][j], hor, .25 + night * .55)); }); }
     else { if (i >= 2) c = mix(c, TH === "wald" || TH === "alpen" ? "#0F1C17" : "#0E1420", (.18 + (i - 2) * .14) * (.4 + .6 * d)); el.setAttribute("fill", c); }
     el.dataset.c = c;
   });
   leafEls.forEach(([el, li, ci]) => { const base = layerEls[li].dataset.c, pal = se.leaf; el.setAttribute("fill", pal.length ? mix(base, pal[ci % pal.length], (.3 + (li - 2) * .07) * (.08 + .92 * d)) : base); el.setAttribute("opacity", pal.length ? 1 : 0); });
-  document.getElementById("sc-lk0").setAttribute("stop-color", mix(hor, "#000000", .1)); document.getElementById("sc-lk1").setAttribute("stop-color", mix(mid, "#000000", .25));
+  { const tq = TH === "alpen" ? .45 * d : 0; document.getElementById("sc-lk0").setAttribute("stop-color", mix(mix(hor, "#000000", .1), "#3FB0BE", tq)); document.getElementById("sc-lk1").setAttribute("stop-color", mix(mix(mid, "#000000", .25), "#1F7F8C", tq)); }
   L.shimmer.setAttribute("opacity", .25 + d * .35);
   if (L.beam) L.beam.setAttribute("opacity", night > .5 ? .9 : 0);
   const morning = m < 620 ? Math.min(1, (620 - m) / 170) : 0;
