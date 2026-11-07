@@ -14,7 +14,7 @@ box.innerHTML = '<svg viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"
 (document.getElementById("hero") || document.querySelector(".hello") || hdr).prepend(box);
 const svg = box.querySelector("svg"), mv = box.querySelector(".sc-move"), fxc = box.querySelector(".sc-fx"), flashEl = box.querySelector(".sc-flash");
 var SC_START = 450, SC_END = 990, SW = 900, SH = 210; // SH: Höhe der Szene (210 = Band, 300 = hoch mit Vordergrund)
-const scHoch = () => { try { return JSON.parse(localStorage.getItem("em-scene-hoch") ?? "true") !== false; } catch { return true; } }; // SW: Breite der Szene, passend zum Banner (nichts wird gestreckt oder abgeschnitten)
+const scHoch = () => { try { return design.w.hoch !== false; } catch { return true; } }; // SW: Breite der Szene, passend zum Banner (nichts wird gestreckt oder abgeschnitten)
 const W = { cover: 0, rain: 0, snow: 0, fog: 0, storm: false, sunrise: 0, sunset: 0 }; // sunrise/sunset in Minuten (vom Wetterdienst)
 const NS = "http://www.w3.org/2000/svg";
 const mk = (tag, attrs, parent = svg) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
@@ -622,7 +622,8 @@ function refresh() { if (!on || playing) return; const s = seasonTest || realSea
 let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); }, 250); }).observe(box); } catch {}
 sceneSync = () => {
   const want = !!design.w.scene;
-  document.body.classList.toggle("has-scene", want); topBar();
+  const hoch = scHoch() ? 300 : 210; if (built && hoch !== SH) built = false;
+  document.body.classList.toggle("has-scene", want); document.body.classList.toggle("scene-flach", want && hoch === 210); topBar();
   if (typeof syncTitlebar === "function") syncTitlebar();
   const pk = JSON.stringify(placeNow());
   if (want === on) { if (on) { refresh(); if (pk !== lastPk) { lastPk = pk; loadWeather(true).then(refresh); } } return; }

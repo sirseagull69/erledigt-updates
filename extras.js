@@ -101,6 +101,7 @@ openSet = function () {
     <h3 class="set-h">Himmel oben</h3>
     <div class="scene-opts">${[["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"]].map(([k, n]) => `<button type="button" data-scene="${k}" aria-pressed="${(design.scene || "wald") === k}">${n}</button>`).join("")}</div>
     <label class="set-row"><span>Landschaft mit Wetter</span><input type="checkbox" id="ex-scene" class="sw" ${design.w.scene ? "checked" : ""}></label>
+    <label class="set-row"><span>Große Landschaft<br><small class="muted">Mit Wiese und Bäumen vorne</small></span><input type="checkbox" id="ex-hoch" class="sw" ${design.w.hoch !== false ? "checked" : ""}></label>
     <div class="set-row col"><span>Wetter-Ort: <b id="ex-cur">${esc(pl.name)}</b></span><span class="set-place"><input id="ex-ort" placeholder="Stadt suchen …" enterkeyhint="search"><button type="button" class="btn" id="ex-find">Suchen</button></span><span class="set-hits" id="ex-hits"></span></div>
     <h3 class="set-h">App</h3>
     <div class="set-row"><span>Neueste Version holen</span><button type="button" class="btn" id="ex-upd" style="padding:8px 14px;font-size:15px">Aktualisieren</button></div>
@@ -134,6 +135,7 @@ $("set").addEventListener("change", (e) => {
   if (id === "ex-von" && /^\d{2}:\d{2}$/.test(e.target.value)) { design.start = e.target.value; changed(); }
   else if (id === "ex-bis" && /^\d{2}:\d{2}$/.test(e.target.value)) { design.end = e.target.value; changed(); }
   else if (id === "ex-scene") { design.w.scene = e.target.checked; changed(); }
+  else if (id === "ex-hoch") { design.w.hoch = e.target.checked; changed(); }
 });
 $("set").addEventListener("keydown", (e) => { if (e.target.id === "ex-ort" && e.key === "Enter") { e.preventDefault(); placeFind(); } });
 // Feierabend-Zeile ist nur Anzeige – Einstellungen gibt es über das Zahnrad

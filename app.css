@@ -379,3 +379,7 @@ body.has-scene .top { margin-left: calc(50% - 50vw); margin-right: calc(50% - 50
   .t-title { font-size: 18px; }
   .t-meta { font-size: 14px; }
 }
+/* Flache Landschaft (Schalter „Große Landschaft“ aus): Kopf wie vor 3.13 */
+body.has-scene.scene-flach .top { min-height: calc(176px + var(--safe-t)); }
+body.has-scene.scene-flach .top::before { display: none; }
+body.has-scene.scene-flach.alles-frei .top { min-height: calc(176px + var(--safe-t)); }
