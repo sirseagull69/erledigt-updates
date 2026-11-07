@@ -271,3 +271,42 @@ renderCal = function () { renderCal0(); document.querySelectorAll("#view-cal .da
 const render2 = render;
 render = function () { render2(); if (loaded) wxHead(); };
 loadWeek(); setInterval(() => loadWeek(), 30 * 60e3);
+
+// ---------- Kalender: Eintrag lange drücken und auf einen anderen Tag ziehen ----------
+let lp = null, drag = null;
+function dragEnd(drop) {
+  if (lp?.timer) clearTimeout(lp.timer); lp = null;
+  if (!drag) return;
+  const { id, ghost, over } = drag; drag = null;
+  ghost.remove(); document.body.classList.remove("dragging-ev");
+  document.querySelectorAll(".day.drop").forEach((d) => d.classList.remove("drop"));
+  swiped = true; setTimeout(() => (swiped = false), 350);
+  if (drop && over) { const t = items.find((x) => x.id === id); if (t && t.due !== over) { patch(id, { due: over }); calSel = over; render(); const d = parseIso(over); toast(`Verschoben auf ${WD[d.getDay()]}, ${d.getDate()}.${d.getMonth() + 1}.`, false); } }
+}
+document.addEventListener("touchstart", (e) => {
+  if (tab !== "cal" || e.touches.length !== 1) return;
+  const w = e.target.closest("#view-cal .task-wrap"); if (!w || e.target.closest("[data-check]")) return;
+  const t = e.touches[0];
+  lp = { x: t.clientX, y: t.clientY, timer: setTimeout(() => {
+    const id = w.dataset.id, it = items.find((x) => x.id === id); if (!it) return;
+    sw = null; // Wischen aus, solange gezogen wird
+    const ghost = document.createElement("div"); ghost.className = "drag-ghost"; ghost.style.setProperty("--c", listById[it.list].dot); ghost.textContent = it.title;
+    document.body.appendChild(ghost); document.body.classList.add("dragging-ev");
+    drag = { id, ghost, over: null }; moveGhost(lp.x, lp.y);
+    try { navigator.vibrate?.(15); } catch {}
+  }, 380) };
+}, { passive: true });
+function moveGhost(x, y) {
+  drag.ghost.style.transform = `translate(${x - 60}px, ${y - 46}px)`;
+  const cell = document.elementFromPoint(x, y)?.closest?.(".day[data-day]");
+  document.querySelectorAll(".day.drop").forEach((d) => d !== cell && d.classList.remove("drop"));
+  if (cell) cell.classList.add("drop");
+  drag.over = cell ? cell.dataset.day : null;
+}
+document.addEventListener("touchmove", (e) => {
+  const t = e.touches[0];
+  if (drag) { e.preventDefault(); moveGhost(t.clientX, t.clientY); return; }
+  if (lp && Math.hypot(t.clientX - lp.x, t.clientY - lp.y) > 8) { clearTimeout(lp.timer); lp = null; }
+}, { passive: false });
+document.addEventListener("touchend", () => dragEnd(true));
+document.addEventListener("touchcancel", () => dragEnd(false));
