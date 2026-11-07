@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.7.4 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.7.5 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1230,6 +1230,7 @@ document.addEventListener("keydown", (e) => { if (fokus && e.key === "Escape") {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.7.5": ["Feiertage in der Landschaft: Advent, Weihnachten, Silvester-Feuerwerk, Ostern, Halloween – automatisch am richtigen Tag", "Ausprobieren: Einstellungen → Himmel testen → Anlass"],
   "2.7.4": ["Im dunklen Modus reicht die Landschaft bis hinter die Listen – weniger leere Fläche", "Kein Hinweis-Fenster mehr beim Wechsel zwischen Arbeit und Privat", "Handy: gleiche Oberfläche wie am PC"],
   "2.7.3": ["Fokus-Modus: Taste F auf einer Aufgabe (oder ◎ im Detail) – die Landschaft füllt das ganze Fenster, dazu nur die eine Aufgabe und ein 25-Minuten-Timer mit Pause und +5 Min", "Esc oder „Fokus beenden“ bringt dich zurück"],
   "2.7.2": ["Erinnern vor dem Termin: Pünktlich, 5, 15, 30 oder 60 Min vorher (Einstellungen → Arbeitstag) – gilt auch fürs Handy", "Schalter „Große Landschaft“ in den Einstellungen: aus = schmales Band wie früher"],
@@ -1465,6 +1466,7 @@ function renderDesign() {
       return `<details class="ds-more st-sec"><summary>Himmel testen</summary>
       <h3>Wetter</h3>${row("w", st.weather, [["echt", "Echt"], ["sonne", "Sonne"], ["wolken", "Wolken"], ["regen", "Regen"], ["schnee", "Schnee"], ["gewitter", "Gewitter"], ["nebel", "Nebel"]])}
       <h3>Jahreszeit</h3>${row("s", st.season, [["echt", "Echt"], ["fruehling", "Frühling"], ["sommer", "Sommer"], ["herbst", "Herbst"], ["winter", "Winter"]])}
+      <h3>Anlass</h3>${row("f", st.fest, [["echt", "Echt"], ["advent", "Advent"], ["weihnachten", "Weihnachten"], ["silvester", "Silvester"], ["ostern", "Ostern"], ["halloween", "Halloween"]])}
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="chip-btn" data-sky-x="day">Tag im Zeitraffer</button><button type="button" class="chip-btn" data-sky-x="ev">Ereignis auslösen</button></div></details>`; })() : ""}`;
 }
 function designChanged() { saveDesign(); applyDesign(); renderDesign(); render(); }
@@ -1472,10 +1474,10 @@ $("design-open").addEventListener("click", () => { renderDesign(); $("design-ove
 $("design-close").addEventListener("click", () => { $("design-overlay").hidden = true; });
 $("design-overlay").addEventListener("click", (e) => {
   if (e.target.id === "design-overlay") { $("design-overlay").hidden = true; return; }
-  const sk = e.target.closest("[data-sky-w],[data-sky-s],[data-sky-x]");
+  const sk = e.target.closest("[data-sky-w],[data-sky-s],[data-sky-f],[data-sky-x]");
   if (sk && window.__scene) {
     const t = window.__scene.skyTest; $("design-overlay").hidden = true;
-    if (sk.dataset.skyW) t.weather(sk.dataset.skyW); else if (sk.dataset.skyS) t.season(sk.dataset.skyS); else setTimeout(() => (sk.dataset.skyX === "day" ? t.day() : t.event()), 200);
+    if (sk.dataset.skyW) t.weather(sk.dataset.skyW); else if (sk.dataset.skyS) t.season(sk.dataset.skyS); else if (sk.dataset.skyF) t.fest(sk.dataset.skyF); else setTimeout(() => (sk.dataset.skyX === "day" ? t.day() : t.event()), 200);
     return;
   }
   const sw = e.target.closest("[data-preset]");
@@ -2892,6 +2894,29 @@ function daylight(m) { if (m < SC_START - 70 || m > SC_END + 80) return 0; if (m
 const SEASON = { winter: { tint: "#DCE6EE", k: .18, snow: true, leaf: [] }, fruehling: { tint: "#7FB27A", k: .2, leaf: ["#8CC47A", "#A8D48A", "#F2B6C6"] }, sommer: { tint: "#4F8A4A", k: .2, leaf: ["#4E8A45", "#5E9A4F", "#3F7A3A"] }, herbst: { tint: "#B8742E", k: .18, leaves: true, leaf: ["#D9822B", "#C2512B", "#E3B23C", "#A8552A", "#D96B2B"] } };
 function realSeason(d = new Date()) { const mo = d.getMonth(); return mo <= 1 || mo === 11 ? "winter" : mo <= 4 ? "fruehling" : mo <= 7 ? "sommer" : "herbst"; }
 let season = realSeason();
+// ---------- Feiertage im Himmel ----------
+// Advent: Lichterkette + Stern am Haus · 24.12.–6.1.: geschmückter Baum · 31.12./1.1. nachts: Feuerwerk
+// Karfreitag–Ostermontag: Eier im Gras + Hase · 31.10.: Kürbisse + Fledermäuse
+function easterOf(y) { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451); return new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1); }
+function realFest(now = new Date()) {
+  const y = now.getFullYear(), t = new Date(y, now.getMonth(), now.getDate()), day = (mo, d) => new Date(y, mo - 1, d);
+  const d24 = day(12, 24), adv1 = new Date(y, 11, 24 - d24.getDay() - 21), ost = easterOf(y);
+  const between = (a, b) => t >= a && t <= b;
+  return {
+    advent: between(adv1, day(12, 23)),
+    baum: t >= day(12, 24) || t <= day(1, 6),
+    feuerwerk: (now.getMonth() === 11 && now.getDate() === 31) || (now.getMonth() === 0 && now.getDate() === 1),
+    ostern: between(new Date(ost.getTime() - 2 * 864e5), new Date(ost.getTime() + 864e5)),
+    halloween: now.getMonth() === 9 && now.getDate() === 31,
+  };
+}
+let festTest = null; // zum Ausprobieren: "advent", "weihnachten", "silvester", "ostern", "halloween"
+function fest() {
+  if (!festTest) return realFest();
+  const f = { advent: false, baum: false, feuerwerk: false, ostern: false, halloween: false };
+  if (festTest === "advent") f.advent = true; else if (festTest === "weihnachten") { f.advent = true; f.baum = true; } else if (festTest === "silvester") { f.baum = true; f.feuerwerk = true; } else if (festTest in f) f[festTest] = true;
+  return f;
+}
 function moonPhase(d = new Date()) { const syn = 29.530588853, ref = Date.UTC(2000, 0, 6, 18, 14); return (((d - ref) / 864e5) % syn + syn) % syn / syn; }
 
 // ---------- Bergkämme ----------
@@ -3051,6 +3076,7 @@ function build() {
   L.fogm = mk("g", {}, mv); // ziehender Nebel (nur bei Nebel sichtbar)
   L.fx = mk("g", {}, mv);
   buildClouds();
+  buildFest();
   // Filmkorn
   draw(cur);
 }
@@ -3074,6 +3100,63 @@ function puff(g, cx, cy, w, h, R, fill, flat = true) {
 }
 function drift(g, w, dur, R) {
   try { const a = g.animate([{ transform: `translateX(${-w}px)` }, { transform: `translateX(${SW + w}px)` }], { duration: dur * 1000, iterations: Infinity, easing: "linear" }); a.currentTime = R() * dur * 1000; } catch {}
+}
+function buildFest() {
+  L.festGlow = []; L.festDark = [];
+  const F = fest(); L.festKey = JSON.stringify(F);
+  if (!(TH === "wald" || TH === "alpen") || !L.house) return;
+  const [hx, hy] = L.house, g = mk("g", {}), gm = mk("g", {}, mv), R = seeded(77);
+  const glow = (el, k = 1) => { L.festGlow.push([el, k]); return el; };
+  // Vordere Wiese: hier steht die Deko, damit man sie sieht (das Haus liegt weit hinten zwischen den Bäumen)
+  const fp = (L.frontPts || []).filter((q) => q[0] > 20 && q[0] < SW - 20);
+  const at = (x) => fp.length ? fp.reduce((m, q) => (Math.abs(q[0] - x) < Math.abs(m[0] - x) ? q : m), fp[0]) : [x, SH - 60];
+  if (F.advent && !F.baum) { // Stern über dem Haus
+    const sx = hx + 1, sy = hy - 40, st = (r1, r2) => Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? r2 : r1; return `${(sx + Math.cos(a) * r).toFixed(1)},${(sy + Math.sin(a) * r).toFixed(1)}`; }).join(" ");
+    glow(mk("circle", { cx: sx, cy: sy, r: 10, fill: "#FFE7A8", opacity: .25, filter: "url(#sc-blur3)" }), .6);
+    glow(mk("polygon", { points: st(4.6, 1.9), fill: "#FFE9AE" }));
+  }
+  if (F.advent || F.baum) { // Tanne auf der Wiese: Advent nur warmweiße Lichter, ab Heiligabend bunt + Kugeln + Stern
+    const [tx, ty0] = at(SW * .2), ty = ty0 + 4, h = 46, w = 15;
+    const tiers = [[1, .0], [.78, .3], [.56, .56], [.34, .8]];
+    let d = "";
+    tiers.forEach(([sc, off]) => { const bw = w * sc, top = ty - h * (off + .42 * (1 - off * .55)), bot = ty - h * off; d += `M${tx - bw} ${bot} Q${tx - bw * .4} ${bot - 2} ${tx} ${top} Q${tx + bw * .4} ${bot - 2} ${tx + bw} ${bot}Q${tx} ${bot + 3} ${tx - bw} ${bot}Z `; });
+    d += `M${tx - 1.6} ${ty} V${ty + 4} H${tx + 1.6} V${ty}Z`;
+    L.festDark.push(mk("path", { d }, g));
+    const cols = F.baum ? ["#FF5A5A", "#FFD36E", "#7FB8FF", "#FF8FD1", "#9BE29B"] : ["#FFE7A8"];
+    for (let row = 0; row < 5; row++) { // Lichterkette schräg um den Baum
+      const v0 = .08 + row * .18, n = 7 - row;
+      for (let k = 0; k < n; k++) { const t = (k + .5) / n, v = v0 + t * .12, half = w * (1 - v) * .95, x = tx - half + t * half * 2, y = ty - h * v; glow(mk("circle", { cx: x, cy: y, r: 1.05, fill: cols[(row * 3 + k) % cols.length], class: "fest-tw", style: `animation-delay:${(R() * 2.4).toFixed(2)}s` }, gm)); }
+    }
+    if (F.baum) {
+      for (let k = 0; k < 9; k++) { const v = .1 + R() * .7, x = tx + (R() - .5) * 1.6 * w * (1 - v), y = ty - h * v + 2; L.festGlow.push([mk("circle", { cx: x, cy: y, r: 1.6, fill: ["#C8323C", "#D9A93A", "#3F6FC2"][k % 3] }, g), -1]); }
+      const sx = tx, sy = ty - h - 2.5, st = Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 1.7 : 4.2; return `${(sx + Math.cos(a) * r).toFixed(1)},${(sy + Math.sin(a) * r).toFixed(1)}`; }).join(" ");
+      glow(mk("circle", { cx: sx, cy: sy, r: 8, fill: "#FFD36E", opacity: .3, filter: "url(#sc-blur3)" }, gm), .7);
+      glow(mk("polygon", { points: st, fill: "#FFD36E" }, gm), 1);
+      // Geschenke unterm Baum
+      [[-9, 4.5, "#C8323C"], [7, 3.6, "#3F6FC2"], [-2.5, 3, "#D9A93A"]].forEach(([dx, sz, c]) => { const x = tx + dx, y = ty + 3; L.festGlow.push([mk("rect", { x: x - sz / 2, y: y - sz, width: sz, height: sz, fill: c, rx: .3 }, g), -1]); L.festGlow.push([mk("rect", { x: x - .35, y: y - sz, width: .7, height: sz, fill: "#F5EBD5" }, g), -1]); });
+    }
+  }
+  if (F.halloween) { // Kürbisse vorne auf der Wiese, Gesichter leuchten abends
+    const [px, py] = at(SW * .22);
+    [[0, 0, 6], [-11, 1, 4.4], [9, 1.4, 3.6]].forEach(([dx, dy, r]) => {
+      const x = px + dx, y = py + dy + 3;
+      L.festGlow.push([mk("ellipse", { cx: x, cy: y - r * .9, rx: r * 1.3, ry: r, fill: "#D9661A" }, g), -1]);
+      mk("path", { d: `M${x - r * .45} ${y - r * 1.85} Q${x - r * .05} ${y - r * .2} ${x - r * .45} ${y} M${x + r * .45} ${y - r * 1.85} Q${x + r * .05} ${y - r * .2} ${x + r * .45} ${y}`, stroke: "#A84A10", "stroke-width": .5, fill: "none", opacity: .6 }, g);
+      mk("path", { d: `M${x} ${y - r * 1.85} q.3 -1.6 1.6 -2`, stroke: "#3E5A2A", "stroke-width": 1, fill: "none", "stroke-linecap": "round" }, g);
+      const cy = y - r * .95;
+      glow(mk("circle", { cx: x, cy, r: r * 1.6, fill: "#FFB347", opacity: .2, filter: "url(#sc-blur3)" }, g), .5);
+      glow(mk("path", { d: `M${x - r * .65} ${cy - r * .05} l${r * .28} ${-r * .42} l${r * .28} ${r * .42}Z M${x + r * .09} ${cy - r * .05} l${r * .28} ${-r * .42} l${r * .28} ${r * .42}Z M${x - r * .7} ${cy + r * .25} q${r * .7} ${r * .55} ${r * 1.4} 0 l${-r * .25} ${r * .12} l${-r * .2} ${-r * .12} l${-r * .25} ${r * .14} l${-r * .25} ${-r * .14} l${-r * .2} ${r * .12}Z`, fill: "#FFD36E" }, g));
+    });
+  }
+  if (F.ostern && fp.length) { // Bunte Eier im Gras, links und rechts vom See
+    const cols = ["#F28AB2", "#8FC8F2", "#F2D36E", "#9BE29B", "#C7A2F2", "#F2A06E"];
+    const spots = fp.filter((q) => (q[0] > 40 && q[0] < L.lake[0] - 20) || (q[0] > L.lake[1] + 20 && q[0] < SW - 40));
+    for (let k = 0; k < 11 && spots.length; k++) {
+      const q = spots[Math.floor(R() * spots.length)], x = q[0] + R() * 6, y = q[1] + 4, c = cols[k % cols.length], rot = `rotate(${((R() - .5) * 50).toFixed(0)} ${x} ${y})`;
+      L.festGlow.push([mk("ellipse", { cx: x, cy: y, rx: 2.3, ry: 3, fill: c, transform: rot }, g), -1]);
+      L.festGlow.push([mk("path", { d: `M${x - 2.2} ${y - .3} q1.1 -1 2.2 0 t2.2 0`, stroke: "#FFFFFF", "stroke-width": .55, fill: "none", opacity: .8, transform: rot }, g), -1]);
+    }
+  }
 }
 function buildClouds() {
   if (!L.clouds) return;
@@ -3202,6 +3285,8 @@ function draw(m) {
     el.dataset.c = c;
   });
   leafEls.forEach(([el, li, ci]) => { const base = layerEls[li].dataset.c, pal = se.leaf; el.setAttribute("fill", pal.length ? mix(base, pal[ci % pal.length], (.3 + (li - 2) * .07) * (.08 + .92 * d)) : base); el.setAttribute("opacity", pal.length ? 1 : 0); });
+  if (L.festGlow) L.festGlow.forEach(([el, k]) => { if (k < 0) el.setAttribute("opacity", .55 + d * .45); else el.setAttribute("opacity", Math.min(1, (.35 + night * .65) * k)); });
+  if (L.festDark && layerEls.length) L.festDark.forEach((el) => el.setAttribute("fill", mix(layerEls[layerEls.length - 1].dataset.c, "#2E6B40", .25 + .45 * d)));
   { const tq = TH === "alpen" ? .45 * d : 0; document.getElementById("sc-lk0").setAttribute("stop-color", mix(mix(hor, "#000000", .1), "#3FB0BE", tq)); document.getElementById("sc-lk1").setAttribute("stop-color", mix(mix(mid, "#000000", .25), "#1F7F8C", tq)); }
   L.shimmer.setAttribute("opacity", .25 + d * .35);
   if (L.beam) L.beam.setAttribute("opacity", night > .5 ? .9 : 0);
@@ -3289,6 +3374,42 @@ const EV = {
     deer.animate([{ opacity: 0 }, { opacity: 1, offset: .08 }, { opacity: 1, offset: .9 }, { opacity: 0 }], { duration: 9000, fill: "forwards" }).finished.then(() => g.remove());
     deer.animate([{ transform: "none" }, { transform: "rotate(0)", offset: .3 }, { transform: "translate(0, .6px) rotate(6deg)", offset: .4 }, { transform: "translate(0, .6px) rotate(6deg)", offset: .6 }, { transform: "none", offset: .7 }, { transform: "translateX(-10px)" }], { duration: 9000 });
   },
+  feuerwerk() { // Rakete steigt, platzt in Funken, die fallen und verglühen
+    const cols = ["#FF5A5A", "#FFD36E", "#7FB8FF", "#FF8FD1", "#9BE29B", "#FFFFFF"], c = cols[Math.floor(Math.random() * cols.length)], c2 = cols[Math.floor(Math.random() * cols.length)];
+    const x = rnd(SW * .12, SW * .88), y = rnd(22, 70), g = mk("g", {}, L.fx), rise = 900 + Math.random() * 500;
+    const trail = mk("circle", { r: .7, fill: "#FFE7C2" }, g);
+    trail.animate([{ transform: `translate(${x + rnd(-10, 10)}px, ${SH - 40}px)`, opacity: .9 }, { transform: `translate(${x}px, ${y}px)`, opacity: 1 }], { duration: rise, easing: "cubic-bezier(.2,.7,.4,1)", fill: "forwards" }).finished.then(() => {
+      trail.remove();
+      const n = 30 + Math.floor(Math.random() * 14), r0 = rnd(26, 42);
+      const flash = mk("circle", { cx: x, cy: y, r: r0 * .9, fill: c, opacity: .35, filter: "url(#sc-blur8)" }, g);
+      flash.animate([{ opacity: .45 }, { opacity: 0 }], { duration: 700, fill: "forwards" });
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2 + rnd(-.08, .08), r = r0 * rnd(.75, 1.05), p = mk("circle", { r: rnd(.8, 1.2), fill: i % 3 ? c : c2 }, g);
+        p.animate([{ transform: `translate(${x}px, ${y}px)`, opacity: 1 }, { transform: `translate(${x + Math.cos(a) * r * .8}px, ${y + Math.sin(a) * r * .8}px)`, opacity: 1, offset: .35 }, { transform: `translate(${x + Math.cos(a) * r}px, ${y + Math.sin(a) * r + 14}px)`, opacity: 0 }], { duration: rnd(1500, 2200), easing: "cubic-bezier(.1,.8,.3,1)", fill: "forwards" });
+      }
+      setTimeout(() => g.remove(), 2600);
+    });
+  },
+  hase() { // hoppelt über die vordere Wiese
+    if (!L.frontPts || !layerEls[4]) return;
+    const dir = Math.random() < .5 ? 1 : -1, g = mk("g", {}, L.fx), c = mix(layerEls[4].dataset.c, "#8A6A4A", .35);
+    const body = mk("g", {}, g);
+    mk("path", { d: "M-3.5 0 Q-4.5 -3.4 -1 -3.6 Q2 -3.8 2.6 -2 L3.6 -2.6 L3.4 -6.4 L4.3 -6.6 L4.6 -2.8 L5 -6 L5.8 -5.9 L5.5 -2.4 Q6.4 -1.6 5.4 -.6 L3 0 Z", fill: c }, body);
+    mk("circle", { cx: -3.6, cy: -2.2, r: .9, fill: "#F2EDE6" }, body);
+    if (dir < 0) body.setAttribute("transform", "scale(-1 1)");
+    const kf = [], pts = L.frontPts.filter((q) => q[0] > 0 && q[0] < SW), steps = 22, x0 = dir > 0 ? 30 : SW - 30, x1 = dir > 0 ? SW * .42 : SW * .58;
+    for (let i = 0; i <= steps; i++) { const x = x0 + (x1 - x0) * i / steps, q = pts.reduce((m, t) => (Math.abs(t[0] - x) < Math.abs(m[0] - x) ? t : m), pts[0]); kf.push({ transform: `translate(${x}px, ${q[1] + 1 - (i % 2 ? 3 : 0)}px)`, opacity: i === 0 || i === steps ? 0 : 1 }); }
+    g.animate(kf, { duration: 7000, easing: "linear", fill: "forwards" }).finished.then(() => g.remove());
+  },
+  fledermaus() { // flattern im Zickzack über den Abendhimmel
+    const g = mk("g", {}, L.fx), y = rnd(30, 80), c = "#120E1C";
+    for (let k = 0; k < 3; k++) {
+      const b = mk("path", { d: "M0 0 Q-2 -2 -5 -1 Q-3 0 -2.6 1 Q-1 .4 0 1.4 Q1 .4 2.6 1 Q3 0 5 -1 Q2 -2 0 0Z", fill: c, transform: `translate(${k * 14} ${(k % 2) * 8})` }, g);
+      b.animate([{ transform: `translate(${k * 14}px, ${(k % 2) * 8}px) scaleY(1)` }, { transform: `translate(${k * 14}px, ${(k % 2) * 8 - 2}px) scaleY(-.6)` }], { duration: 180 + k * 30, iterations: 120, direction: "alternate" });
+    }
+    const kf = []; for (let i = 0; i <= 12; i++) kf.push({ transform: `translate(${-40 + (SW + 80) * i / 12}px, ${y + Math.sin(i * 1.7) * 14}px)` });
+    g.animate(kf, { duration: 14000, easing: "linear" }).finished.then(() => g.remove());
+  },
   leaf() { // Blätter lösen sich aus einer Baumkrone, flattern im Wind und landen am Boden
     if (!SEASON[season].leaves && season !== "fruehling") return;
     const pal = SEASON[season].leaves ? SEASON.herbst.leaf : ["#F7D6E0", "#FFFFFF", "#F2B6C6"];
@@ -3310,7 +3431,7 @@ const EV = {
     }
   },
 };
-function randomEvent() { const nat = TH === "wald" || TH === "alpen"; const pool = isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
+function randomEvent() { const nat = TH === "wald" || TH === "alpen", F = fest(); const pool = isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : []), ...(F.halloween ? ["fledermaus", "fledermaus", "fledermaus"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : []), ...(F.ostern && nat ? ["hase", "hase", "hase"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
 
 
 // ---------- Wetter (Open-Meteo, kein Konto, nur fester Ort Nufringen) ----------
@@ -3453,7 +3574,7 @@ function fxStep(now) {
 }
 document.addEventListener("visibilitychange", () => fxSync());
 new MutationObserver(() => fxSync()).observe(document.body, { attributes: true, attributeFilter: ["class"] });
-let built = false, on = false, tick = 0, evT = 0, leafT = 0;
+let built = false, on = false, tick = 0, evT = 0, leafT = 0, fwT = 0;
 const quiet = () => document.hidden || reduce.matches; // Ereignisse auch, wenn Erledigt sichtbar, aber nicht aktiv ist – nur nicht minimiert/verdeckt
 let lastEv = 0;
 const fire = (name) => { lastEv = Date.now(); EV[name](); };
@@ -3461,7 +3582,7 @@ function nextEvent() { clearTimeout(evT); evT = setTimeout(() => { if (on && !qu
 window.addEventListener("focus", () => { if (on && !quiet() && Date.now() - lastEv > 300000) setTimeout(() => { lastEv = Date.now(); randomEvent(); }, 1500); });
 function measure() { const w = box.clientWidth, h = box.clientHeight; return w && h ? Math.max(700, Math.min(2600, Math.round(SH * w / h))) : SW; }
 let seasonTest = null, playing = 0;
-function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || theme() !== TH || Math.abs(nw - SW) > 30) { season = s; SW = nw; build(); built = true; } else if (wKey() !== wxKey) buildClouds(); draw(minuteNow()); }
+function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || theme() !== TH || Math.abs(nw - SW) > 30 || JSON.stringify(fest()) !== L.festKey) { season = s; SW = nw; build(); built = true; } else if (wKey() !== wxKey) buildClouds(); draw(minuteNow()); }
 let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); }, 250); }).observe(box); } catch {}
 sceneSync = () => {
   const want = !!design.w.scene;
@@ -3472,28 +3593,30 @@ sceneSync = () => {
   if (want === on) { if (on) { refresh(); if (pk !== lastPk) { lastPk = pk; loadWeather(true).then(refresh); } } return; }
   lastPk = pk;
   on = want;
-  clearInterval(tick); clearTimeout(evT); clearInterval(leafT);
+  clearInterval(tick); clearTimeout(evT); clearInterval(leafT); clearInterval(fwT);
   if (!on) { svg.innerHTML = ""; built = false; fxSync(); return; }
   refresh();
   loadWeather().then(refresh);
   tick = setInterval(() => { refresh(); if (new Date().getMinutes() % 30 === 0) loadWeather().then(refresh); }, 60000);
   nextEvent();
   leafT = setInterval(() => { if (on && !quiet() && SEASON[season].leaves && Math.random() < .35) EV.leaf(); }, 60000);
+  clearInterval(fwT); fwT = setInterval(() => { if (on && !quiet() && fest().feuerwerk && isNight() && Math.random() < .7) EV.feuerwerk(); }, 2600);
   setTimeout(() => { if (on && !quiet()) fire(isNight() ? "star" : "plane"); }, 4000);
 };
 // Test-Werkzeuge fürs Design-Menü
 const skyTest = {
   weather(name) { store.set("erledigt-wetter-test", name === "echt" ? "" : name); W.cover = W.rain = W.snow = W.fog = 0; W.storm = false; loadWeather(name === "echt").then(refresh); },
   season(name) { seasonTest = name === "echt" ? null : name; built = false; refresh(); },
+  fest(name) { festTest = name === "echt" ? null : name; built = false; refresh(); if (festTest === "silvester") [0, 700, 1500].forEach((t) => setTimeout(() => EV.feuerwerk(), t)); if (festTest === "ostern") setTimeout(() => EV.hase(), 400); if (festTest === "halloween") setTimeout(() => EV.fledermaus(), 400); },
   event() { if (on) fire(isNight() ? ["star", "sat", "plane", "reh"][Math.floor(Math.random() * 4)] : ["plane", "birds", "reh", "leaf"][Math.floor(Math.random() * 4)]); },
   day() { // ganzer Tag in 15 Sekunden
     if (!on) return; cancelAnimationFrame(playing); const t0 = performance.now();
     const step = (t) => { const k = Math.min(1, (t - t0) / 15000), m = Math.round(300 + k * 1110); draw(m); if (k < 1) playing = requestAnimationFrame(step); else { playing = 0; refresh(); } };
     playing = requestAnimationFrame(step);
   },
-  state: () => ({ weather: store.get("erledigt-wetter-test", "") || "echt", season: seasonTest || "echt" }),
+  state: () => ({ weather: store.get("erledigt-wetter-test", "") || "echt", season: seasonTest || "echt", fest: festTest || "echt" }),
 };
-window.__scene = { bolt: () => { fx.bolt = makeBolt(); }, EV, skyTest, reloadWeather: () => loadWeather(true).then(refresh), sw: () => SW, draw: (m) => draw(m), weather: (c, cv) => { applyWeather(c, cv); refresh(); }, season: (s) => { season = s; build(); draw(minuteNow()); } }; // für Tests
+window.__scene = { house: () => L.house, bolt: () => { fx.bolt = makeBolt(); }, EV, skyTest, reloadWeather: () => loadWeather(true).then(refresh), sw: () => SW, draw: (m) => draw(m), weather: (c, cv) => { applyWeather(c, cv); refresh(); }, season: (s) => { season = s; build(); draw(minuteNow()); } }; // für Tests
 sceneSync();
 })();
 
@@ -3510,7 +3633,7 @@ function openSetup() {
   const pl = design.place || { name: "Nufringen", lat: 48.62, lon: 8.89 }, noJob = !feierabendAt();
   ov.innerHTML = `<div class="ach-modal setup" role="dialog" aria-label="Einrichtung">
     <header><h2>Kurz einrichten</h2><button type="button" class="x" id="setup-x" aria-label="Schließen">×</button></header>
-    <label class="su-row"><span>Dein Vorname</span><input id="su-name" maxlength="40" value="${esc(design.name || "")}" placeholder="z. B. Jessica"></label>
+    <label class="su-row"><span>Dein Vorname</span><input id="su-name" maxlength="40" value="${esc(design.name || "")}"></label>
     <div class="su-row"><span>Wofür nutzt du Erledigt?</span><div class="opt-row" role="group" id="su-mode">
       <button type="button" data-su-mode="arbeit" aria-pressed="${!privMode()}">Arbeit</button><button type="button" data-su-mode="privat" aria-pressed="${privMode()}">Privat</button></div>
       <small>Privat: Listen Privat, Haushalt, Einkaufen, Termine · Alltagssprüche · keine Mail-Funktionen</small></div>

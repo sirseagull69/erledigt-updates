@@ -1009,3 +1009,7 @@ body.has-scene .app > :not(.hero) { position: relative; z-index: 21; }
 body.has-scene .hero:has(.inbox:not([hidden])) { z-index: 40; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.has-scene:not(.scene-flach):not(.fokus) .hero .sc { bottom: -28vh; -webkit-mask-image: linear-gradient(#000 58%, transparent); mask-image: linear-gradient(#000 58%, transparent); } }
 :root[data-theme="dark"] body.has-scene:not(.scene-flach):not(.fokus) .hero .sc { bottom: -28vh; -webkit-mask-image: linear-gradient(#000 58%, transparent); mask-image: linear-gradient(#000 58%, transparent); }
+
+/* Feiertags-Lichter im Himmel (Lichterkette, Christbaum) */
+.sc .fest-tw { animation: scFest 2.4s ease-in-out infinite; }
+@keyframes scFest { 50% { opacity: .35; } }
