@@ -298,8 +298,8 @@ function placeNow() { try { const p = design.place; if (p && isFinite(p.lat) && 
 function minuteNow() {
   const n = new Date(), wd = n.getDay(), toM = (s) => { const [h, mi] = String(s).split(":").map(Number); return (h || 0) * 60 + (mi || 0); };
   const ov = workToday();
-  if (ov && !privMode()) { SC_START = toM(ov.start); SC_END = Math.max(toM(ov.end), SC_START + 60); }
-  else if (privMode() || !feierabendAt()) { SC_START = W.sunrise || 450; SC_END = W.sunset || 1020; } // privat: echter Sonnenauf- und -untergang
+  if (false && ov) { SC_START = toM(ov.start); SC_END = Math.max(toM(ov.end), SC_START + 60); }
+  else if (true) { SC_START = W.sunrise || 450; SC_END = W.sunset || 1020; } // privat: echter Sonnenauf- und -untergang
   else if (wd === 0 || wd === 6) { SC_START = 540; SC_END = 1080; } // Wochenende: 9–18 Uhr
   else { SC_START = toM(arbeitsbeginn()); SC_END = toM(feierabendAt()); if (SC_END - SC_START < 60) SC_END = SC_START + 60; }
   return Math.max(300, Math.min(1410, n.getHours() * 60 + n.getMinutes()));
