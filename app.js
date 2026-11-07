@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.7.5 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.0 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -493,6 +493,10 @@ function render() {
   enterIdx = 0;
   $("view-seg").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === view)));
   if (MINI) $("mini-count").textContent = loaded ? `${vis.length} offen` : "";
+  if (loaded && list === "einkaufen" && view === "list" && !MINI) { // Einkaufsliste wie Bring (03c-einkauf.js)
+    document.body.classList.remove("alles-frei"); seen = new Set(vis.map((t) => t.id));
+    $("tasks").innerHTML = shopHtml(); updateFun(); if (detailId) renderDetail(); return;
+  }
   if (loaded && view === "month" && !MINI) {
     $("tasks").innerHTML = monthHtml(); updateFun(); if (detailId) renderDetail(); return;
   }
@@ -539,7 +543,7 @@ function updateHint() {
     return;
   }
   $("hint").classList.toggle("idle", !v.trim());
-  if (!v.trim()) { $("hint").innerHTML = `Tipp: <code>morgen 14:30</code> Erinnerung · <code>donnerstags</code> wiederholen · <code>!</code> hoch · ${privMode() ? "<code>#einkaufen</code>" : "<code>#privat</code>"} · <code>/</code> Vorlagen`; return; }
+  if (!v.trim()) { $("hint").innerHTML = `Tipp: <code>morgen 14:30</code> Erinnerung · <code>donnerstags</code> wiederholen · <code>!</code> hoch · ${privMode() ? "<code>#einkaufen</code>" : "<code>#privat</code>"} · <code>/</code> Vorlagen`; if (list === "einkaufen") $("hint").innerHTML = `Tipp: <code>Milch, Brot, Eier</code> legt drei Artikel an · unten im Katalog antippen · Kachel antippen = gekauft`; return; }
   const p = parseInput(v);
   const bits = [listById[p.list || (list === "alle" ? defList() : list)].name, prioById[p.prio || draftPrio].name];
   if (p.due) bits.push(dueText(p));
@@ -1225,11 +1229,99 @@ $("fokus").addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => { if (fokus && e.key === "Escape") { e.stopPropagation(); endFokus(); } }, true);
 
+// ===== 03c-einkauf.js =====
+// ======================================================================
+// ---------- Einkaufsliste wie Bring: Kacheln statt Zeilen, Katalog nach Regalen, Zuletzt gekauft ----------
+// ======================================================================
+// Gilt nur für die Liste „Einkaufen“ in der Listenansicht. Jeder Artikel bleibt eine normale Aufgabe (Sync, Details, Handy wie gehabt):
+// Tipp auf Kachel im Korb = gekauft (erledigt) · Tipp im Katalog = in den Korb · Tipp bei „Zuletzt gekauft“ = wieder in den Korb.
+// Eingabe oben: „Milch, Brot, Eier“ legt drei Artikel an. Rechtsklick / langer Druck öffnet die Details (Menge, Notiz).
+const SHOP_CATS = [
+  ["Obst & Gemüse", ["🍎 Äpfel", "🍌 Bananen", "🍐 Birnen", "🍇 Trauben", "🍓 Erdbeeren", "🫐 Blaubeeren", "🍊 Orangen", "🍋 Zitronen", "🥝 Kiwi", "🍑 Pfirsiche", "🍒 Kirschen", "🍍 Ananas", "🥭 Mango", "🍉 Melone", "🥑 Avocado", "🍅 Tomaten", "🥒 Gurke", "🥕 Möhren", "🧅 Zwiebeln", "🧄 Knoblauch", "🥔 Kartoffeln", "🥬 Salat", "🥦 Brokkoli", "🥦 Blumenkohl", "🫑 Paprika", "🌶️ Chili", "🍆 Aubergine", "🥒 Zucchini", "🌽 Mais", "🍄 Champignons", "🥬 Spinat", "🥬 Lauch", "🫛 Erbsen", "🌿 Kräuter", "🫚 Ingwer", "🥗 Rucola"]],
+  ["Brot & Backwaren", ["🍞 Brot", "🥖 Baguette", "🥐 Croissants", "🥯 Brötchen", "🍞 Toast", "🥨 Brezeln", "🧇 Waffeln", "🍰 Kuchen", "🍪 Kekse", "🥙 Wraps", "🫓 Fladenbrot"]],
+  ["Milch & Kühlregal", ["🥛 Milch", "🥛 Hafermilch", "🧈 Butter", "🧀 Käse", "🧀 Gouda", "🧀 Feta", "🧀 Mozzarella", "🧀 Parmesan", "🧀 Frischkäse", "🥛 Joghurt", "🥛 Quark", "🥛 Sahne", "🥛 Schmand", "🥚 Eier", "🥓 Speck", "🍖 Schinken", "🌭 Wurst", "🥩 Aufschnitt", "🧈 Margarine", "🍮 Pudding", "🥛 Skyr"]],
+  ["Fleisch & Fisch", ["🍗 Hähnchen", "🥩 Hackfleisch", "🥩 Rindfleisch", "🥩 Schnitzel", "🌭 Würstchen", "🍗 Pute", "🐟 Lachs", "🐟 Fischstäbchen", "🍤 Garnelen", "🥫 Thunfisch", "🥩 Steak", "🌱 Tofu"]],
+  ["Vorräte", ["🍝 Nudeln", "🍚 Reis", "🥣 Haferflocken", "🥣 Müsli", "🌾 Mehl", "🍬 Zucker", "🧂 Salz", "🫙 Pesto", "🍅 Passata", "🥫 Tomaten (Dose)", "🥫 Kichererbsen", "🥫 Bohnen", "🥫 Mais (Dose)", "🫒 Oliven", "🫙 Gewürzgurken", "🧴 Olivenöl", "🧴 Rapsöl", "🫙 Essig", "🍯 Honig", "🫙 Marmelade", "🥜 Erdnussbutter", "🍫 Nutella", "🧂 Gewürze", "🧂 Brühe", "🫙 Senf", "🥫 Ketchup", "🥫 Mayo", "🍜 Instant-Nudeln", "🫘 Linsen", "🥔 Kartoffelpüree", "🧁 Backpulver", "🍫 Backschokolade", "🌰 Nüsse", "🥥 Kokosmilch", "🍛 Currypaste", "🍜 Sojasoße"]],
+  ["Tiefkühl", ["🍕 Pizza", "🍟 Pommes", "🥦 TK-Gemüse", "🍓 TK-Beeren", "🍨 Eis", "🥟 Maultaschen", "🥐 Aufbackbrötchen", "🌿 TK-Kräuter", "🥬 TK-Spinat"]],
+  ["Getränke", ["💧 Wasser", "🧃 Apfelsaft", "🧃 Orangensaft", "🥤 Cola", "🥤 Limo", "🍺 Bier", "🍷 Wein", "☕ Kaffee", "🍵 Tee", "🥛 Kakao", "🧋 Eistee", "🍾 Sekt", "⚡ Energy"]],
+  ["Snacks & Süßes", ["🍫 Schokolade", "🍬 Gummibärchen", "🥨 Chips", "🥨 Salzstangen", "🍿 Popcorn", "🍪 Müsliriegel", "🥜 Erdnüsse", "🍩 Donuts", "🍭 Bonbons", "🧇 Waffeln", "🍫 Riegel"]],
+  ["Haushalt", ["🧻 Toilettenpapier", "🧻 Küchenrolle", "🧴 Spülmittel", "🧽 Schwämme", "🧼 Spültabs", "🧺 Waschmittel", "🧴 Weichspüler", "🗑️ Müllbeutel", "🧴 Allzweckreiniger", "🧻 Taschentücher", "🧴 Glasreiniger", "🔋 Batterien", "💡 Glühbirne", "🧽 Putzlappen", "🧴 Entkalker", "🕯️ Kerzen", "🎁 Geschenkpapier", "📦 Alufolie", "📦 Frischhaltefolie", "📦 Backpapier"]],
+  ["Drogerie", ["🪥 Zahnpasta", "🪥 Zahnbürste", "🧴 Shampoo", "🧴 Duschgel", "🧼 Seife", "🧴 Deo", "🧴 Creme", "🪒 Rasierer", "🧴 Sonnencreme", "🩹 Pflaster", "💊 Schmerztabletten", "🧻 Wattepads", "🧴 Handcreme", "🧴 Haarspray", "🧴 Spülung", "🧴 Lippenpflege"]],
+  ["Tiere", ["🐱 Katzenfutter", "🐱 Katzenstreu", "🐱 Leckerlis", "🐶 Hundefutter", "🐾 Snacks (Tier)"]],
+];
+const SHOP_ITEMS = SHOP_CATS.flatMap(([cat, arr]) => arr.map((s) => { const i = s.indexOf(" "); return { emoji: s.slice(0, i), name: s.slice(i + 1), cat }; }));
+const shopKey = (s) => String(s || "").toLowerCase().replace(/\d+\s*(x|st|stk|g|kg|l|ml|pack|packung|flaschen?|dosen?)?\b/g, "").replace(/[^a-zäöüß ]/g, "").trim();
+const SHOP_BY_KEY = Object.fromEntries(SHOP_ITEMS.map((x) => [shopKey(x.name), x]));
+// Icon für einen frei eingetippten Artikel: exakt, sonst Wortanfang, sonst nach Kategorie-Stichworten
+function shopIcon(title) {
+  const k = shopKey(title); if (!k) return "🛒";
+  if (SHOP_BY_KEY[k]) return SHOP_BY_KEY[k].emoji;
+  const w = k.split(" ")[0];
+  const hit = SHOP_ITEMS.find((x) => { const xk = shopKey(x.name); return xk === w || xk.startsWith(w) || w.startsWith(xk) || k.includes(xk); });
+  return hit ? hit.emoji : "🛒";
+}
+const shopItems = () => items.filter((t) => !t.archived && t.list === "einkaufen");
+function shopHtml() {
+  const all = shopItems(), open = all.filter((t) => !t.done).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const cut = Date.now() - 45 * 864e5;
+  const recent = all.filter((t) => t.done && t.doneAt && t.doneAt > cut).sort((a, b) => b.doneAt - a.doneAt);
+  const seenNames = new Set(), recentU = recent.filter((t) => { const k = shopKey(t.title); if (seenNames.has(k)) return false; seenNames.add(k); return true; }).slice(0, 24);
+  const openKeys = new Set(open.map((t) => shopKey(t.title)));
+  const tile = (t, cls) => `<button type="button" class="sh-tile ${cls}" data-sh="${t.id}" title="${esc(t.title)}"><span class="sh-ico">${shopIcon(t.title)}</span><span class="sh-name">${esc(t.title)}</span>${t.notes ? `<span class="sh-note">${esc(t.notes.split("\n")[0].slice(0, 18))}</span>` : ""}</button>`;
+  const q = shopQuery.trim().toLowerCase();
+  let h = `<div class="shop">`;
+  h += `<section class="sh-sec sh-korb"><h4><span>Im Korb</span><b>${open.length}</b>${open.length ? `<button type="button" class="sh-all" data-sh-all="1">Alles gekauft</button>` : ""}</h4>`;
+  h += open.length ? `<div class="sh-grid">${open.map((t) => tile(t, "in")).join("")}</div>` : `<div class="sh-empty">Noch nichts im Korb. Unten antippen oder oben eintippen – <code>Milch, Brot, Eier</code> legt gleich drei an.</div>`;
+  h += `</section>`;
+  if (recentU.length && !q) h += `<section class="sh-sec"><h4><span>Zuletzt gekauft</span><b>${recentU.length}</b></h4><div class="sh-grid">${recentU.map((t) => tile(t, openKeys.has(shopKey(t.title)) ? "in" : "was")).join("")}</div></section>`;
+  h += `<section class="sh-sec sh-kat"><h4><span>Katalog</span><input type="search" class="sh-search" placeholder="Suchen …" value="${esc(shopQuery)}" aria-label="Im Katalog suchen"></h4>`;
+  const cats = q ? [["Treffer", SHOP_ITEMS.filter((x) => x.name.toLowerCase().includes(q))]] : SHOP_CATS.map(([c]) => [c, SHOP_ITEMS.filter((x) => x.cat === c)]);
+  cats.forEach(([c, arr]) => { if (!arr.length) return; h += `<div class="sh-cat"><h5>${esc(c)}</h5><div class="sh-grid sh-small">${arr.map((x) => `<button type="button" class="sh-tile${openKeys.has(shopKey(x.name)) ? " in" : ""}" data-sh-add="${esc(x.name)}"><span class="sh-ico">${x.emoji}</span><span class="sh-name">${esc(x.name)}</span></button>`).join("")}</div></div>`; });
+  if (q && !cats[0][1].some((x) => x.name.toLowerCase() === q)) h += `<button type="button" class="sh-tile sh-new" data-sh-add="${esc(shopQuery.trim())}"><span class="sh-ico">➕</span><span class="sh-name">„${esc(shopQuery.trim())}“ hinzufügen</span></button>`;
+  h += `</section></div>`;
+  return h;
+}
+let shopQuery = "";
+function shopAdd(name) {
+  const k = shopKey(name), ex = shopItems().find((t) => !t.done && shopKey(t.title) === k);
+  if (ex) { remove([ex.id], `„${ex.title}“ aus dem Korb genommen`); return; }
+  addItem({ title: name, list: "einkaufen", prio: "mittel" });
+}
+$("tasks").addEventListener("click", async (e) => {
+  if (list !== "einkaufen") return;
+  const all = e.target.closest("[data-sh-all]"); if (all) { const ids = shopItems().filter((t) => !t.done).map((t) => t.id); burst(all, 24, 1.6); sfx.done(); for (const id of ids) toggleDone(id); render(); return; }
+  const add = e.target.closest("[data-sh-add]"); if (add) { shopAdd(add.dataset.shAdd); render(); const s = $("tasks").querySelector(".sh-search"); if (s && shopQuery) { shopQuery = ""; render(); } return; }
+  const b = e.target.closest("[data-sh]"); if (!b) return;
+  const id = b.dataset.sh, t = items.find((x) => x.id === id); if (!t) return;
+  if (!t.done) { b.classList.add("popping"); sfx.done(); burst(b, 14, 1.2); await wait(260); toggleDone(id); render(); }
+  else { // zuletzt gekauft → wieder in den Korb (neuer Eintrag, der alte bleibt für die Statistik)
+    const k = shopKey(t.title); if (shopItems().some((x) => !x.done && shopKey(x.title) === k)) { showToast(`„${t.title}“ ist schon im Korb`); return; }
+    addItem({ title: t.title, list: "einkaufen", prio: "mittel", notes: t.notes || "" }); render();
+  }
+});
+$("tasks").addEventListener("contextmenu", (e) => { const b = e.target.closest("[data-sh]"); if (!b || list !== "einkaufen") return; e.preventDefault(); selected = b.dataset.sh; openDetail(b.dataset.sh); });
+{ let pressT = 0; // langer Druck am Handy öffnet die Details
+  $("tasks").addEventListener("touchstart", (e) => { const b = e.target.closest("[data-sh]"); if (!b) return; clearTimeout(pressT); pressT = setTimeout(() => { navigator.vibrate?.(10); selected = b.dataset.sh; openDetail(b.dataset.sh); b.dataset.held = "1"; }, 550); }, { passive: true });
+  ["touchend", "touchmove", "touchcancel"].forEach((ev) => $("tasks").addEventListener(ev, () => clearTimeout(pressT), { passive: true }));
+  $("tasks").addEventListener("click", (e) => { const b = e.target.closest("[data-sh]"); if (b?.dataset.held) { delete b.dataset.held; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+}
+$("tasks").addEventListener("input", (e) => { if (!e.target.classList.contains("sh-search")) return; shopQuery = e.target.value; const pos = e.target.selectionStart; render(); const s = $("tasks").querySelector(".sh-search"); if (s) { s.focus(); try { s.setSelectionRange(pos, pos); } catch {} } });
+$("tasks").addEventListener("keydown", (e) => { if (e.target.classList.contains("sh-search") && e.key === "Enter" && shopQuery.trim()) { e.preventDefault(); const hit = SHOP_ITEMS.find((x) => x.name.toLowerCase() === shopQuery.trim().toLowerCase()) || SHOP_ITEMS.find((x) => x.name.toLowerCase().startsWith(shopQuery.trim().toLowerCase())); shopAdd(hit ? hit.name : shopQuery.trim()); shopQuery = ""; render(); $("tasks").querySelector(".sh-search")?.focus(); } });
+// Eingabe oben: mehrere Artikel mit Komma
+$("addform").addEventListener("submit", (e) => {
+  if (list !== "einkaufen") return;
+  const v = $("new").value.trim(); if (!v.includes(",") || v.startsWith("/")) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  v.split(",").map((s) => s.trim()).filter(Boolean).forEach((s) => { const p = parseInput(s); const title = p.title || s; if (!shopItems().some((t) => !t.done && shopKey(t.title) === shopKey(title))) addItem({ ...p, title, list: "einkaufen", prio: p.prio || "mittel" }); });
+  $("new").value = ""; updateHint(); render();
+}, true);
+
 // ===== 04-mitteilungen-design.js =====
 // ======================================================================
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.0": ["Einkaufen wie bei Bring: Kacheln, Katalog nach Regalen, Zuletzt gekauft – Tipp aufs Kästchen = gekauft", "Oben „Milch, Brot, Eier“ eintippen legt gleich drei Artikel an", "Neue Landschaften: Unterwasser und Dschungel"],
   "2.7.5": ["Feiertage in der Landschaft: Advent, Weihnachten, Silvester-Feuerwerk, Ostern, Halloween – automatisch am richtigen Tag", "Ausprobieren: Einstellungen → Himmel testen → Anlass"],
   "2.7.4": ["Im dunklen Modus reicht die Landschaft bis hinter die Listen – weniger leere Fläche", "Kein Hinweis-Fenster mehr beim Wechsel zwischen Arbeit und Privat", "Handy: gleiche Oberfläche wie am PC"],
   "2.7.3": ["Fokus-Modus: Taste F auf einer Aufgabe (oder ◎ im Detail) – die Landschaft füllt das ganze Fenster, dazu nur die eine Aufgabe und ein 25-Minuten-Timer mit Pause und +5 Min", "Esc oder „Fokus beenden“ bringt dich zurück"],
@@ -1455,7 +1547,7 @@ function renderDesign() {
     <section class="st-sec"><h3>Modus</h3>${opt("mode", [["arbeit", "Arbeit"], ["privat", "Privat"]])}</section>
     <section class="st-sec"><h3>Hell oder Dunkel</h3>${opt("theme", [["system", window.desktop?.platform === "darwin" ? "Wie Mac" : "Wie Windows"], ["light", "Hell"], ["dark", "Dunkel"]], theme)}</section>
     <section class="st-sec"><h3>Farbe</h3><div class="st-tiles">${Object.entries(PRESETS).map(swatch).join("")}<label class="st-tile custom" aria-pressed="${!!design.custom}"><i style="--a:${design.custom || "#f43f5e"};--b:${design.custom || "#3b82f6"}"${design.custom ? "" : ' class="rainbow"'}></i><span>Eigene</span><input type="color" id="custom-color" value="${cust}"></label></div></section>
-    <section class="st-sec"><h3>Landschaft</h3>${opt("scene", [["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"]])}</section>
+    <section class="st-sec"><h3>Landschaft</h3>${opt("scene", [["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"], ["wasser", "Unterwasser"], ["dschungel", "Dschungel"]])}</section>
     <section class="st-sec"><h3>Arbeitstag</h3><div class="st-list">
       <button type="button" class="st-item" data-setup="1"><span class="st-l"><b>Arbeitszeit</b><small>${feierabendAt() ? `${arbeitsbeginn()} – ${feierabendAt()} Uhr` : "keine festgelegt"}</small></span>${chev}</button>
       <button type="button" class="st-item" id="setup-open"><span class="st-l"><b>Name & Wetter-Ort</b><small>${esc(design.name || "kein Name")} · ${esc(weatherPlace().name)}</small></span>${chev}</button>
@@ -2935,8 +3027,8 @@ const LAYERS = [ // seed, Grundlinie, Höhe, Rauheit, Tannen
 // Vordergrund im hohen Modus: nahe Wiese mit Bäumen, ganz vorne ein Hang
 const FRONT = [[78, 236, 10, 1.5, .4], [91, 274, 8, 1.3, .26]];
 let L = {}, layerEls = [], leafEls = [];
-// Landschaften: wald (Schwarzwald), alpen, kueste, stadt, schlicht – Auswahl im Design-Menü
-const THEMES = ["wald", "alpen", "kueste", "stadt", "schlicht"];
+// Landschaften: wald (Schwarzwald), alpen, kueste, stadt, schlicht, wasser (Unterwasser), dschungel – Auswahl im Design-Menü
+const THEMES = ["wald", "alpen", "kueste", "stadt", "schlicht", "wasser", "dschungel"];
 const theme = () => { try { return THEMES.includes(design.scene) ? design.scene : "wald"; } catch { return "wald"; } };
 const LAYERS_ALP = [[11, 104, 92, 2.4, 0], [23, 128, 66, 2, 0], [37, 158, 20, 1.4, .3], [51, 176, 12, 1.6, .55], [64, 196, 8, 1.8, .72]];
 // Alpen: schroffe, hohe Felsgipfel statt sanfter Schwarzwaldkuppen
@@ -2966,6 +3058,7 @@ function build() {
   <linearGradient id="sc-cdu" x1="0" y1="0" x2="0" y2="70" gradientUnits="userSpaceOnUse"><stop id="sc-du0" offset="0"/><stop id="sc-du1" offset=".6"/><stop id="sc-du2" offset="1"/></linearGradient>
   <linearGradient id="sc-clu" x1="0" y1="0" x2="0" y2="50" gradientUnits="userSpaceOnUse"><stop id="sc-lu0" offset="0"/><stop id="sc-lu1" offset="1"/></linearGradient>
   <linearGradient id="sc-shaft" x1="0" y1="0" x2="0" y2="1"><stop id="sc-sh0" offset="0" stop-opacity=".55"/><stop id="sc-sh1" offset="1" stop-opacity="0"/></linearGradient>
+  <linearGradient id="sc-wray" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4F7FF" stop-opacity=".55"/><stop offset=".7" stop-color="#E4F7FF" stop-opacity=".12"/><stop offset="1" stop-color="#E4F7FF" stop-opacity="0"/></linearGradient>
   <filter id="sc-soft" x="-10%" y="-30%" width="120%" height="160%"><feGaussianBlur stdDeviation="1.1"/></filter>
   <filter id="sc-blur5" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
   <filter id="sc-blur8" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="8"/></filter>
@@ -3003,8 +3096,10 @@ function build() {
   leafEls = []; L.lights = []; L.smoke = null;
   const HOUSE = Math.round(SW * .33), LAKE = [Math.round(SW * .46), Math.round(SW * .46) + 200]; L.lake = LAKE;
   TH = theme();
-  L.shimmer = null; L.frontPts = null; L.beam = null;
-  if (TH === "kueste") buildCoast(defs);
+  L.shimmer = null; L.frontPts = null; L.beam = null; L.rel = []; L.col = [];
+  if (TH === "wasser") buildWater(defs);
+  else if (TH === "dschungel") buildJungle(defs);
+  else if (TH === "kueste") buildCoast(defs);
   else if (TH === "stadt") buildCity(defs);
   else if (TH === "schlicht") buildPlain();
   else (TH === "alpen" ? LAYERS_ALP : LAYERS).concat(SH > 210 ? FRONT : []).forEach(([seed, base, amp, rough, pines], i) => {
@@ -3161,6 +3256,7 @@ function buildFest() {
 function buildClouds() {
   if (!L.clouds) return;
   L.clouds.innerHTML = ""; L.fogm.innerHTML = ""; wxKey = wKey(); fx.parts = [];
+  if (TH === "wasser") return;
   const R = seeded(Math.round(W.cover * 10) * 7 + (W.rain ? 3 : 0) + (W.snow ? 5 : 0) + 11), wet = W.rain || W.snow, wind = W.storm ? 2.4 : wet ? 1.5 : 1;
   // Quellwolken (Schönwetter bis bewölkt)
   const n = wet ? Math.round(3 + W.cover * 3) : Math.round(W.cover * 9 + (W.cover > .15 ? 1 : 0));
@@ -3204,6 +3300,95 @@ function buildClouds() {
 function fogBand(base, R) { const fg = mk("g", { filter: "url(#sc-blur8)" }); for (let j = 0; j < Math.ceil(SW / 190); j++) mk("ellipse", { cx: 80 + j * 190 + R() * 60, cy: base + 8, rx: 90 + R() * 70, ry: 7 + R() * 4, class: "fogc" }, fg); }
 const layer = (d) => { const g = mk("g", {}), p = mk("path", { d }, g); layerEls.push(p); return p; };
 const ridgeD = (pts) => `M-10 ${SH} L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} ${SH}Z`;
+
+// ---------- Dschungel: Kronendach in Schichten, Wasserfall, Lianen, große Blätter vorne – Papageien, Schmetterlinge, nachts Glühwürmchen ----------
+const JUNGLE = ["#7FAE8C", "#5E9A6E", "#447F57", "#2F6644", "#214E33", "#163B25", "#102C1B"];
+function buildJungle(defs) {
+  // Ruhig wie der Schwarzwald: Kammlinien hintereinander im Dunst, darauf Silhouetten von Palmen, Urwaldriesen und runden Kronen.
+  const R = seeded(173), f1 = (n) => n.toFixed(1);
+  const jl = (d, k, j) => { const p = layer(d); p.dataset.k = k; p.dataset.j = j; return p; };
+  const near = (pts, x) => pts.reduce((m, q) => (Math.abs(q[0] - x) < Math.abs(m[0] - x) ? q : m), pts[0]);
+  const palm = (x, y, h, lean) => { const tx = x + lean, ty = y - h; let d = ` M${f1(x - 1)} ${y + 3} Q${f1(x + lean * .5 - .9)} ${f1(y - h * .5)} ${f1(tx - .7)} ${f1(ty)} L${f1(tx + .7)} ${f1(ty)} Q${f1(x + lean * .5 + .9)} ${f1(y - h * .5)} ${f1(x + 1)} ${y + 3}Z`; for (let f = 0; f < 7; f++) { const a = -.05 - f * (Math.PI * .95 / 6), l = h * (.42 + R() * .18), ex = tx + Math.cos(a) * l, ey = ty - Math.sin(a) * l * .35 + l * .3; d += ` M${f1(tx)} ${f1(ty)} Q${f1((tx + ex) / 2 + Math.cos(a) * 2)} ${f1((ty + ey) / 2 - l * .38)} ${f1(ex)} ${f1(ey)} Q${f1((tx + ex) / 2)} ${f1((ty + ey) / 2 - l * .06)} ${f1(tx)} ${f1(ty)}Z`; } return d; };
+  const giant = (x, y, h) => { const w = h * .06; let d = ` M${f1(x - w)} ${y + 3} L${f1(x - w * .5)} ${f1(y - h)} L${f1(x + w * .5)} ${f1(y - h)} L${f1(x + w)} ${y + 3}Z M${f1(x - w * 2.4)} ${y + 3} Q${f1(x - w * .8)} ${f1(y - h * .12)} ${f1(x - w * .5)} ${f1(y - h * .22)} L${f1(x + w * .5)} ${f1(y - h * .22)} Q${f1(x + w * .8)} ${f1(y - h * .12)} ${f1(x + w * 2.4)} ${y + 3}Z`; [[0, -.08, .34], [-.3, .02, .26], [.3, .03, .26], [-.5, .14, .18], [.5, .15, .18]].forEach(([dx, dy, rr]) => { const cx = x + dx * h, cy = y - h + dy * h, r = rr * h; d += ` M${f1(cx - r)} ${f1(cy + r * .5)} a${f1(r)} ${f1(r * .55)} 0 1 1 ${f1(2 * r)} 0Z`; }); return d; };
+  const crown = (x, y, r) => ` M${f1(x - r)} ${f1(y + 2)} a${f1(r)} ${f1(r * .85)} 0 1 1 ${f1(2 * r)} 0Z`;
+  // Ferne Karsthügel, zwei Stufen, dazwischen Dunst
+  jl(ridgeD(ridgePts(7, 96, 34, 1, false).map(([x, y]) => [x, y + 10 * Math.max(0, Math.sin(x / 110 + 1))])), .12, 0);
+  jl(ridgeD(ridgePts(11, 118, 36, 1, false).map(([x, y]) => [x, y + 12 * Math.max(0, Math.sin(x / 70))])), .24, 0); fogBand(126, R);
+  // Kronendach in drei Stufen: dichte Kronen auf der Kammlinie, ein paar Palmen und Riesen, die rausragen
+  [[23, 142, 10, 7, .55, 2, 1, .4], [37, 164, 9, 9, .6, 3, 1, .58], [51, SH > 210 ? 222 : 190, 8, 12, .65, 3, 2, .78]].forEach(([seed, base, amp, size, dens, palms, giants, k], i) => {
+    const pts = ridgePts(seed, base, amp, .6, false); let d = ridgeD(pts);
+    for (let x = -10; x < SW + 10; x += size * .9) { if (R() < dens) { const q = near(pts, x); d += crown(x, q[1], size * (.6 + R() * .6)); } }
+    for (let n = 0; n < palms; n++) { const q = near(pts, 30 + R() * (SW - 60)); d += palm(q[0], q[1], size * (2 + R() * .8), (R() - .5) * size * .8); }
+    for (let n = 0; n < giants; n++) { const q = near(pts, 40 + R() * (SW - 80)); d += giant(q[0], q[1], size * (3.4 + R() * 1.2)); }
+    jl(d, k, i + 1);
+    if (i < 2) fogBand(base + 6, R);
+  });
+  // Vorne nur ein dunkler Hang mit zwei großen Palmwedeln am Rand – kein Kleinkram
+  const leaf = (x, y, l, ang, w) => { const ex = x + Math.cos(ang) * l, ey = y - Math.sin(ang) * l, nx = Math.sin(ang) * w, ny = Math.cos(ang) * w; return ` M${f1(x)} ${f1(y)} Q${f1((x + ex) / 2 + nx)} ${f1((y + ey) / 2 + ny)} ${f1(ex)} ${f1(ey)} Q${f1((x + ex) / 2 - nx)} ${f1((y + ey) / 2 - ny)} ${f1(x)} ${f1(y)}Z`; };
+  let d4 = `M-10 ${SH + 10} V${SH - 20} Q${SW * .5} ${SH - 30} ${SW + 10} ${SH - 18} V${SH + 10}Z`;
+  for (let k = 0; k < 4; k++) { d4 += leaf(-8, SH - 14, 80 + R() * 40, .35 + k * .3, 9); d4 += leaf(SW + 8, SH - 14, 80 + R() * 40, Math.PI - .35 - k * .3, 9); }
+  jl(d4, .95, 5);
+  // Zwei Lianen am linken und rechten Rand, schwingen kaum merklich
+  L.lianas = mk("g", {}, mv);
+  [[22, 110], [SW - 26, 130]].forEach(([x, len], i) => { const g = mk("g", { class: "liana" }, L.lianas), sx = (R() - .5) * 24; mk("path", { d: `M${x} -5 Q${f1(x + sx)} ${f1(len * .5)} ${f1(x + sx * .4)} ${len} Q${f1(x + sx * .45)} ${len + 1} ${x + 1.2} -5Z`, class: "lianaS" }, g); for (let k = 0; k < 4; k++) { const t = .3 + k * .18, px = x + sx * (2 * t * (1 - t) + t * t * .4), py = len * t; mk("path", { d: leaf(px, py, 7 + R() * 4, (k % 2 ? -1 : 1) * .5 + .2, 2.2), class: "lianaL" }, g); } try { g.style.transformBox = "view-box"; g.style.transformOrigin = `${x}px -5px`; g.animate([{ transform: "rotate(-1.2deg)" }, { transform: "rotate(1.2deg)" }], { duration: 7000 + i * 1200, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }); } catch {} });
+  L.frontPts = [[SW * .2, SH - 24]]; L.lake = [SW * .2, SW * .2]; L.house = null;
+}
+
+// ---------- Unterwasser: Riff mit Korallen, Lichtstrahlen von oben, Blasen, Seegras – nachts Plankton und Quallen ----------
+const CORAL = ["#E8788F", "#F0A05A", "#9B7FD6", "#4FBFA8", "#E9D36A", "#D95A5A", "#F2B8C6"];
+function buildWater() {
+  const R = seeded(131), FL = SH - 6, sway = (el, ox, oy, deg, dur) => { try { el.style.transformBox = "view-box"; el.style.transformOrigin = `${ox}px ${oy}px`; const a = el.animate([{ transform: `rotate(${-deg}deg)` }, { transform: `rotate(${deg}deg)` }], { duration: dur, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }); a.currentTime = R() * dur; } catch {} };
+  const wl = (d, k, tint) => { const p = layer(d); p.dataset.k = k; if (tint) p.dataset.tint = tint; return p; };
+  const quad = (x1, y1, x2, y2, w1, w2) => { const dx = x2 - x1, dy = y2 - y1, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l; return `M${(x1 + nx * w1).toFixed(1)} ${(y1 + ny * w1).toFixed(1)} L${(x2 + nx * w2).toFixed(1)} ${(y2 + ny * w2).toFixed(1)} L${(x2 - nx * w2).toFixed(1)} ${(y2 - ny * w2).toFixed(1)} L${(x1 - nx * w1).toFixed(1)} ${(y1 - ny * w1).toFixed(1)}Z `; };
+  // Korallenformen (Pfad-Strings; Farbe kommt über dataset.tint aus draw())
+  const staghorn = (x, y, h, ang, w) => { let d = ""; const go = (x, y, h, ang, w, dp) => { const x2 = x + Math.sin(ang) * h, y2 = y - Math.cos(ang) * h; d += quad(x, y, x2, y2, w, w * .6); if (dp < 3) { const n = R() < .6 ? 2 : 1; for (let i = 0; i < n; i++) go(x2, y2, h * (.6 + R() * .2), ang + (i ? 1 : -1) * (.35 + R() * .5), w * .65, dp + 1); } else d += `M${(x2 - w).toFixed(1)} ${y2.toFixed(1)} a${w} ${w} 0 1 0 ${w * 2} 0 a${w} ${w} 0 1 0 ${-w * 2} 0Z `; }; go(x, y, h, ang, w, 0); return d; };
+  const brain = (x, y, r) => { let d = `M${(x - r * 1.2).toFixed(1)} ${y + 2} `; const n = 7; for (let i = 0; i <= n; i++) { const a = Math.PI - (i / n) * Math.PI, bx = x + Math.cos(a) * r * 1.2, by = y - Math.sin(a) * r * (.9 + R() * .3); d += `${i ? "Q" + (x + Math.cos(a + .22) * r * 1.5).toFixed(1) + " " + (y - Math.sin(a + .22) * r * 1.35).toFixed(1) + " " : "L"}${bx.toFixed(1)} ${by.toFixed(1)} `; } return d + `L${(x + r * 1.2).toFixed(1)} ${y + 2}Z `; };
+  const fan = (x, y, r) => { let d = `M${x - 1} ${y} L${x + 1} ${y} L${x + 1} ${y - r * .3} `; const n = 9; for (let i = 0; i <= n; i++) { const a = -.1 - (i / n) * (Math.PI - .2), rr = r * (.75 + R() * .35), bx = x + Math.cos(a) * rr, by = y - r * .3 + Math.sin(a) * rr; d += `L${bx.toFixed(1)} ${by.toFixed(1)} L${(x + Math.cos(a - .15) * rr * .72).toFixed(1)} ${(y - r * .3 + Math.sin(a - .15) * rr * .72).toFixed(1)} `; } return d + `L${x - 1} ${y - r * .3}Z `; };
+  const tubes = (x, y, h) => { let d = ""; for (let i = 0; i < 3 + Math.floor(R() * 3); i++) { const tx = x + i * 5 - 6, th = h * (.5 + R() * .7), w = 2 + R() * 1.4; d += `M${(tx - w).toFixed(1)} ${y + 2} V${(y - th).toFixed(1)} a${w} ${w * .5} 0 0 1 ${w * 2} 0 V${y + 2}Z `; } return d; };
+  const star = (x, y, r) => { let d = ""; for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * 1.2566, a2 = a + .6283; d += `${i ? "L" : "M"}${(x + Math.cos(a) * r).toFixed(1)} ${(y + Math.sin(a) * r).toFixed(1)} L${(x + Math.cos(a2) * r * .45).toFixed(1)} ${(y + Math.sin(a2) * r * .45).toFixed(1)} `; } return d + "Z "; };
+  const floor = (seed, base, amp) => ridgePts(seed, base, amp, .4, false);
+  // Hinten: ferne Riffkanten (blau verschwommen)
+  const far = floor(11, FL - 78, 22); wl(ridgeD(far), .18);
+  let d = ""; for (let i = 0; i < Math.ceil(SW / 100); i++) { const q = far[Math.floor(R() * far.length)]; d += R() < .5 ? staghorn(q[0], q[1] + 2, 9 + R() * 8, (R() - .5) * .6, 1.2) : brain(q[0], q[1] + 2, 6 + R() * 6); } wl(d, .28, "#5A8FB8");
+  // Lichtstrahlen (schwanken), zwischen fernem und mittlerem Riff; draw() schiebt sie mit der Sonne
+  L.shafts = mk("g", { opacity: 0 });
+  [[-150, 40, 18], [-70, 70, 26], [20, 54, 22], [110, 76, 30], [200, 46, 18], [-230, 36, 14]].forEach(([x, w, deg], i) => { const p = mk("path", { d: `M${x - w * .2} -20 L${x + w * .2} -20 L${x + w + deg * 4} ${SH + 20} L${x - w + deg * 4} ${SH + 20}Z`, fill: "url(#sc-wray)" }, L.shafts); sway(p, x, -20, 1.6, 9000 + i * 1700); });
+  // Mitte: Riff mit Korallen in Farbe
+  const mid = floor(23, FL - 44, 16); wl(ridgeD(mid), .5);
+  const byTint = {};
+  for (let i = 0; i < Math.ceil(SW / 60); i++) { const q = mid[Math.floor(R() * mid.length)], t = Math.floor(R() * CORAL.length), kind = R(); byTint[t] = (byTint[t] || "") + (kind < .35 ? staghorn(q[0], q[1] + 3, 12 + R() * 12, (R() - .5) * .5, 1.6) : kind < .55 ? brain(q[0], q[1] + 3, 8 + R() * 8) : kind < .8 ? fan(q[0], q[1] + 3, 12 + R() * 10) : tubes(q[0], q[1] + 3, 14 + R() * 10)); }
+  Object.keys(byTint).forEach((t) => wl(byTint[t], .55, CORAL[t]));
+  // Sandboden mit Lichtflecken (Kaustik) und Seesternen
+  const sand = floor(37, FL - 10, 5); const sp = wl(ridgeD(sand), .72); sp.dataset.sand = 1;
+  L.shimmer = mk("g", {}, mv);
+  for (let j = 0; j < SW / 14; j++) { const q = sand[Math.floor(R() * sand.length)], y = q[1] + 2 + R() * Math.max(2, SH - q[1] - 2); mk("path", { d: `M${q[0]} ${y.toFixed(1)} q${4 + R() * 6} -2 ${10 + R() * 14} 0`, stroke: "#fff", "stroke-width": .7, "stroke-linecap": "round", fill: "none", class: "shim", style: `animation-delay:${R() * 3}s` }, L.shimmer); }
+  d = ""; for (let i = 0; i < 4; i++) { const q = sand[Math.floor(R() * sand.length)]; d += star(q[0], q[1] + 5 + R() * 6, 4 + R() * 2.5); } wl(d, .74, "#E8788F");
+  // Vorne: große Korallenstöcke, Seegras und Anemonen (schwanken, liegen in der bewegten Ebene)
+  d = ""; const nearTint = CORAL[Math.floor(R() * CORAL.length)];
+  [[SW * .08, 1], [SW * .9, 1], [SW * .5, .6]].forEach(([x, sc]) => { d += brain(x, FL, 22 * sc) + staghorn(x - 30 * sc, FL + 2, 24 * sc, -.4, 2.4) + staghorn(x + 32 * sc, FL + 2, 20 * sc, .35, 2.2); });
+  wl(d, .9, nearTint);
+  d = ""; [[SW * .22, 1], [SW * .72, .8]].forEach(([x, sc]) => { d += fan(x, FL + 1, 26 * sc) + tubes(x + 30 * sc, FL + 1, 24 * sc); }); wl(d, .92, CORAL[(CORAL.indexOf(nearTint) + 3) % CORAL.length]);
+  L.kelp = mk("g", {}, mv);
+  for (let i = 0; i < Math.ceil(SW / 45); i++) {
+    const x = R() * SW, h = 30 + R() * 60, w = 2.2 + R() * 1.6, pts = [];
+    for (let k = 0; k <= 6; k++) pts.push([x + Math.sin(k * 1.5 + x) * 5 * (k / 6), FL + 4 - h * k / 6]);
+    let kd = `M${(pts[0][0] - w).toFixed(1)} ${pts[0][1]}`; pts.forEach(([px, py], k) => { if (k) kd += ` L${(px - w * (1 - k / 7)).toFixed(1)} ${py.toFixed(1)}`; }); for (let k = 6; k >= 0; k--) kd += ` L${(pts[k][0] + w * (1 - k / 7)).toFixed(1)} ${pts[k][1].toFixed(1)}`; kd += "Z";
+    const p = mk("path", { d: kd, class: "kelp" }, L.kelp); sway(p, x, FL + 4, 3 + R() * 3, 5000 + R() * 4000);
+  }
+  L.anem = mk("g", {}, mv);
+  for (let i = 0; i < Math.ceil(SW / 160); i++) { const x = 40 + R() * (SW - 80), c = ["#F2B8C6", "#F0A05A", "#C9B6FF"][i % 3], g = mk("g", {}, L.anem); for (let k = 0; k < 14; k++) { const a = -Math.PI * .95 + (k / 13) * Math.PI * .9, l = 7 + R() * 6, p = mk("path", { d: `M${x.toFixed(1)} ${FL + 2} Q${(x + Math.cos(a) * l * .5).toFixed(1)} ${(FL + 2 + Math.sin(a) * l * .6).toFixed(1)} ${(x + Math.cos(a) * l).toFixed(1)} ${(FL + 2 + Math.sin(a) * l).toFixed(1)}`, stroke: c, "stroke-width": 1.6, "stroke-linecap": "round", fill: "none" }, g); sway(p, x, FL + 2, 5, 2500 + R() * 2000); } }
+  // Blasen aus dem Boden
+  L.bubbles = mk("g", {}, mv);
+  for (let i = 0; i < Math.ceil(SW / 40); i++) { const x = R() * SW, r = .6 + R() * 1.6, dur = 7000 + R() * 8000, b = mk("circle", { cx: 0, cy: 0, r, fill: "#fff", opacity: 0 }, L.bubbles); try { const a = b.animate([{ transform: `translate(${x}px, ${FL}px)`, opacity: 0 }, { opacity: .55, offset: .08 }, { transform: `translate(${x + 14}px, ${FL * .6}px)`, opacity: .5, offset: .5 }, { transform: `translate(${x - 6}px, 6px)`, opacity: 0 }], { duration: dur, iterations: Infinity, easing: "linear" }); a.currentTime = R() * dur; } catch {} }
+  // Plankton: leuchtet nachts
+  L.plankton = mk("g", { opacity: 0 }, mv);
+  for (let i = 0; i < SW / 9; i++) mk("circle", { class: "star", cx: R() * SW, cy: 10 + R() * (SH - 30), r: .5 + R() * .7, fill: "#9FF5E8", style: `animation-delay:${R() * 3.4}s` }, L.plankton);
+  // Wasseroberfläche von unten: zwei wellige Bänder ziehen gegeneinander
+  L.surface = mk("g", {}, mv);
+  [[0, 5, 120], [4, 3.5, 170]].forEach(([y0, amp, dur], j) => { let sd = `M${-SW} ${y0}`; for (let x = -SW; x <= SW * 2; x += 36) sd += ` Q${x + 18} ${(y0 + amp * 2 * (R() * .5 + .5)).toFixed(1)} ${x + 36} ${y0}`; sd += ` L${SW * 2} -40 L${-SW} -40Z`; const p = mk("path", { d: sd, class: "wsurf", opacity: .35 - j * .12 }, L.surface); try { p.animate([{ transform: "translateX(0)" }, { transform: `translateX(${j ? 72 : -72}px)` }], { duration: dur * 100, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }); } catch {} });
+  L.frontPts = [[SW * .2, FL - 12]]; L.lake = [SW * .2, SW * .2]; L.house = null;
+}
+
 
 // ---------- Küste: Landzungen, Meer mit Glitzern, Leuchtturm auf der Klippe ----------
 function buildCoast() {
@@ -3272,10 +3457,14 @@ function draw(m) {
   let [top, mid, hor] = sky(m); const d = daylight(m), night = 1 - d, se = SEASON[season];
   const ov = Math.min(1, W.cover * .7 + (W.rain || W.snow ? .25 : 0) + (W.storm ? .2 : 0)); // Bewölkung färbt den Himmel grau
   if (ov > 0) { const g = (a, b) => mix(a, b, night * .85); top = mix(top, g("#8E98A5", "#10121A"), ov * .8); mid = mix(mid, g("#B3BAC3", "#181A24"), ov * .75); hor = mix(hor, g("#C7CCD2", "#22242E"), ov * .6); }
+  const skyHor = hor, lt = d * (1 - ov * .5); // Unterwasser: Licht kommt von oben, Himmel färbt nur die Oberfläche
+  if (TH === "wasser") { top = mix(mix("#06142C", "#2A8FB8", lt), skyHor, .22 * lt); mid = mix("#040D22", "#176189", lt); hor = mix("#02081A", "#0B3B63", lt); }
   ["sc-s0", "sc-s1", "sc-s2"].forEach((id, i) => document.getElementById(id).setAttribute("stop-color", [top, mid, hor][i]));
   // Luftperspektive: hinten fast Horizontfarbe, vorne dunkel; tagsüber mit Jahreszeit-Ton
   const deep = mix(mix(top, "#05070F", .55), "#05070F", night * .5);
   layerEls.forEach((el, i) => {
+    if (TH === "dschungel") { const k = +el.dataset.k, j = +el.dataset.j; let c = mix(hor, deep, k); c = mix(c, JUNGLE[Math.min(6, j + 1)], (.28 + j * .08) * (.2 + .8 * d)); el.setAttribute("fill", c); el.dataset.c = c; return; }
+    if (TH === "wasser") { const c0 = mix(hor, "#010510", +el.dataset.k || .5); const c = el.dataset.tint ? mix(c0, el.dataset.tint, .7 * lt) : el.dataset.sand ? mix(c0, "#CBB984", .62 * lt) : c0; el.setAttribute("fill", c); el.dataset.c = c; return; }
     const k = Math.min(1, .22 + i * (layerEls.length > 5 ? .13 : .19));
     let c = mix(hor, deep, k);
     c = mix(c, se.tint, se.k * 1.8 * d * (.3 + i / 5.5));
@@ -3284,32 +3473,49 @@ function draw(m) {
     else { if (i >= 2) c = mix(c, TH === "wald" || TH === "alpen" ? "#0F1C17" : "#0E1420", (.18 + (i - 2) * .14) * (.4 + .6 * d)); el.setAttribute("fill", c); }
     el.dataset.c = c;
   });
+  if (L.rel) L.rel.forEach(([el, li, k]) => { const base = layerEls[li]?.dataset.c; if (base) el.setAttribute("fill", mix(base, k > 0 ? "#06100A" : "#FFFFFF", Math.abs(k) * (k > 0 ? 1 : .5 + .5 * d))); });
+  if (L.col) L.col.forEach(([el, c]) => el.setAttribute("fill", mix(c, "#0A1020", night * .85)));
   leafEls.forEach(([el, li, ci]) => { const base = layerEls[li].dataset.c, pal = se.leaf; el.setAttribute("fill", pal.length ? mix(base, pal[ci % pal.length], (.3 + (li - 2) * .07) * (.08 + .92 * d)) : base); el.setAttribute("opacity", pal.length ? 1 : 0); });
   if (L.festGlow) L.festGlow.forEach(([el, k]) => { if (k < 0) el.setAttribute("opacity", .55 + d * .45); else el.setAttribute("opacity", Math.min(1, (.35 + night * .65) * k)); });
   if (L.festDark && layerEls.length) L.festDark.forEach((el) => el.setAttribute("fill", mix(layerEls[layerEls.length - 1].dataset.c, "#2E6B40", .25 + .45 * d)));
   { const tq = TH === "alpen" ? .45 * d : 0; document.getElementById("sc-lk0").setAttribute("stop-color", mix(mix(hor, "#000000", .1), "#3FB0BE", tq)); document.getElementById("sc-lk1").setAttribute("stop-color", mix(mix(mid, "#000000", .25), "#1F7F8C", tq)); }
-  L.shimmer.setAttribute("opacity", .25 + d * .35);
+  L.shimmer.setAttribute("opacity", TH === "wasser" ? lt * .55 : .25 + d * .35);
+  if (TH === "dschungel") {
+    const lk = layerEls[layerEls.length - 1]?.dataset.c || "#102C1B";
+    box.querySelectorAll(".lianaS").forEach((e) => e.setAttribute("fill", mix(lk, "#3B2A1A", .35)));
+    box.querySelectorAll(".lianaL").forEach((e) => e.setAttribute("fill", mix(lk, "#4E9A5E", .3 * d)));
+    box.querySelectorAll(".wfall").forEach((e) => e.setAttribute("fill", mix(mix(hor, "#FFFFFF", .55), "#8FB8D8", night * .6)));
+  }
+  if (TH === "wasser") {
+    L.shafts.setAttribute("opacity", (lt * .9).toFixed(2));
+    L.plankton.setAttribute("opacity", (night * .9).toFixed(2));
+    box.querySelectorAll(".wsurf").forEach((e) => e.setAttribute("fill", mix(top, "#FFFFFF", .35 + .25 * lt)));
+    box.querySelectorAll(".kelp").forEach((e) => e.setAttribute("fill", mix(mix(hor, "#010510", .85), "#2E8A5A", .65 * lt)));
+    L.anem.setAttribute("opacity", (.35 + .65 * lt).toFixed(2));
+  }
   if (L.beam) L.beam.setAttribute("opacity", night > .5 ? .9 : 0);
   const morning = m < 620 ? Math.min(1, (620 - m) / 170) : 0;
   if (L.smoke) { L.smoke.setAttribute("opacity", .55); L.smoke.querySelectorAll("circle").forEach((c) => c.setAttribute("fill", mix(hor, "#FFFFFF", .3 * d))); }
   svg.querySelectorAll(".fogc").forEach((f) => { f.setAttribute("fill", mix(hor, "#FFFFFF", d * .25 + morning * .2)); f.setAttribute("opacity", Math.min(.95, .32 + night * .1 + morning * .4 + W.fog * .5 + ov * .15)); });
   { const stc = mix(mix("#FFFFFF", hor, .35 + (1 - d) * .3), top, night * .7); ["sc-st0", "sc-st1", "sc-st2"].forEach((id) => document.getElementById(id).setAttribute("stop-color", stc)); }
-  L.streaks.setAttribute("opacity", Math.min(1, .75 - night * .45 + ov * .5));
+  L.streaks.setAttribute("opacity", TH === "wasser" ? 0 : Math.min(1, .75 - night * .45 + ov * .5));
   // Sonne: Bogen vom Arbeitsbeginn bis Feierabend, geht hinter den Bergen unter
   const p = (m - SC_START) / (SC_END - SC_START);
   const sx = 70 + Math.max(-.15, Math.min(1.15, p)) * (SW - 200), sy = 150 - Math.sin(Math.max(0, Math.min(1, p)) * Math.PI) * 125 + (p > 1 ? (p - 1) * 380 : p < 0 ? -p * 380 : 0);
-  [L.sun, L.bloom].forEach((e) => { e.setAttribute("cx", sx); e.setAttribute("cy", sy); });
+  const wasser = TH === "wasser";
+  [L.sun, L.bloom].forEach((e) => { e.setAttribute("cx", sx); e.setAttribute("cy", wasser ? -24 : sy); });
+  if (wasser) L.shafts.setAttribute("transform", `translate(${sx} 0)`);
   const low = p < .15 || p > .8;
   L.sun.setAttribute("fill", low ? "#FFC27A" : "#FFF4D6");
-  L.bloom.setAttribute("opacity", (p > -.15 && p < 1.15 ? (low ? 1 : .75) : 0) * (1 - ov * .85)); L.sun.setAttribute("opacity", 1 - ov * .9);
+  L.bloom.setAttribute("opacity", (p > -.15 && p < 1.15 ? (low ? 1 : .75) : 0) * (1 - ov * .85)); L.sun.setAttribute("opacity", wasser ? 0 : 1 - ov * .9);
   L.rays.setAttribute("transform", `translate(${sx} ${sy})`);
-  L.rays.setAttribute("opacity", (low && p > -.05 && p < 1.05 ? .9 : .25 * d) * (1 - ov));
+  L.rays.setAttribute("opacity", wasser ? 0 : (low && p > -.05 && p < 1.05 ? .9 : .25 * d) * (1 - ov));
   // Mond, Sterne
   const starO = m < 420 ? Math.max(0, 1 - (m - 330) / 90) : m > 1010 ? Math.min(1, (m - 1010) / 100) : 0;
-  L.stars.setAttribute("opacity", starO * (1 - ov)); L.twinkle.setAttribute("opacity", starO * (1 - ov));
+  L.stars.setAttribute("opacity", wasser ? 0 : starO * (1 - ov)); L.twinkle.setAttribute("opacity", wasser ? 0 : starO * (1 - ov));
   const mp = m > 960 ? (m - 960) / 450 : (m + 1440 - 960) / 450;
   L.moon.setAttribute("transform", `translate(${160 + Math.min(1, mp) * (SW - 340)} ${36 + Math.abs(mp - .5) * 50})`);
-  L.moon.setAttribute("opacity", starO * (1 - ov * .85));
+  L.moon.setAttribute("opacity", starO * (1 - ov * .85) * (wasser ? .6 : 1));
   // Lichter im Tal
   const on = m > SC_END - 10 ? Math.min(1, (m - (SC_END - 10)) / 110) : m < SC_START ? Math.max(0, (SC_START - m) / 50) : 0;
   L.lights.forEach(([c, th]) => c.setAttribute("opacity", th < on ? .95 : 0));
@@ -3330,7 +3536,7 @@ function draw(m) {
   }
   fxSync();
   // Schrift passend zum Himmel
-  const light = lum(mix(top, mid, .5)) > .5 && !W.storm; // bei Gewitter hängt die dunkle Decke hinter der Schrift
+  const light = lum(mix(top, mid, .5)) > .5 && !W.storm && TH !== "wasser"; // bei Gewitter hängt die dunkle Decke hinter der Schrift
   hdr.style.setProperty("--hfg", light ? "#142030" : "#F6F2FA");
   hdr.style.setProperty("--hfg2", light ? "#34465C" : "#C9C4DA");
   hdr.classList.toggle("sc-light", light);
@@ -3410,6 +3616,82 @@ const EV = {
     const kf = []; for (let i = 0; i <= 12; i++) kf.push({ transform: `translate(${-40 + (SW + 80) * i / 12}px, ${y + Math.sin(i * 1.7) * 14}px)` });
     g.animate(kf, { duration: 14000, easing: "linear" }).finished.then(() => g.remove());
   },
+  fische() { // Schwarm kleiner Fische zieht vorbei
+    const dir = Math.random() < .5 ? 1 : -1, n = 8 + Math.floor(Math.random() * 9), g = mk("g", {}, L.fx), y0 = rnd(50, SH - 90), night = isNight();
+    const pal = [["#C9D6E3", "#8FA3B8"], ["#F2C94C", "#E0A32E"], ["#5DADE2", "#3B7FBF"], ["#F28C6B", "#D9633F"]][Math.floor(Math.random() * 4)];
+    for (let i = 0; i < n; i++) {
+      const s = rnd(.8, 1.3), x = rnd(-50, 50), y = rnd(-22, 22), f = mk("g", {}, g);
+      mk("path", { d: "M-4 0 Q-1.5 -2.6 2.2 -1.8 Q4.2 -1 4.6 0 Q4.2 1 2.2 1.8 Q-1.5 2.6 -4 0Z M-4 0 L-6.5 -2.2 L-6 0 L-6.5 2.2Z", fill: night ? "#0A1530" : pal[i % 3 ? 0 : 1], transform: `translate(${x} ${y}) scale(${s * dir} ${s})` }, f);
+      if (!night) mk("circle", { cx: x + 2.6 * s * dir, cy: y - .5 * s, r: .45 * s, fill: "#1B2430" }, f);
+      f.animate([{ transform: "translateY(0)" }, { transform: `translateY(${rnd(2, 5)}px)` }], { duration: rnd(900, 1600), iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
+    }
+    const kf = []; for (let i = 0; i <= 10; i++) kf.push({ transform: `translate(${dir > 0 ? -80 + (SW + 160) * i / 10 : SW + 80 - (SW + 160) * i / 10}px, ${y0 + Math.sin(i * 1.3) * 18}px)` });
+    g.animate(kf, { duration: rnd(16000, 24000), easing: "linear" }).finished.then(() => g.remove());
+  },
+  schildkroete() { // Meeresschildkröte paddelt gemächlich durch
+    const dir = Math.random() < .5 ? 1 : -1, g = mk("g", {}, L.fx), night = isNight(), c = night ? "#0A1530" : "#4E8F6A", c2 = night ? "#0A1530" : "#3B6E52";
+    const b = mk("g", { transform: `scale(${dir} 1)` }, g);
+    const fl = mk("path", { d: "M-6 -6 Q-12 -15 -2 -12 Q3 -10 4 -7Z M-6 6 Q-12 15 -2 12 Q3 10 4 7Z M-12 -3 Q-16 -5 -15 -1Z M-12 3 Q-16 5 -15 1Z", fill: c2 }, b);
+    fl.animate([{ transform: "rotate(-10deg)" }, { transform: "rotate(10deg)" }], { duration: 1900, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
+    mk("path", { d: "M12 -1 Q18 -4 20 -1 Q18 3 12 2Z", fill: c2 }, b);
+    mk("path", { d: "M-12 0 Q-12 -9 0 -9 Q12 -9 12 0 Q12 7 0 7 Q-12 7 -12 0Z", fill: c }, b);
+    if (!night) { mk("path", { d: "M-8 -3 Q0 -7 8 -3 M-9 1 Q0 -3 9 1 M-7 4 Q0 1 7 4", stroke: c2, "stroke-width": .7, fill: "none" }, b); mk("circle", { cx: 17.5, cy: -1.5, r: .7, fill: "#1B2430" }, b); }
+    const y0 = rnd(40, SH - 100), kf = []; for (let i = 0; i <= 12; i++) kf.push({ transform: `translate(${dir > 0 ? -40 + (SW + 80) * i / 12 : SW + 40 - (SW + 80) * i / 12}px, ${y0 + Math.sin(i * .9) * 10}px)` });
+    g.animate(kf, { duration: rnd(38000, 50000), easing: "linear" }).finished.then(() => g.remove());
+  },
+  hai() { // Hai weit hinten, nur Silhouette
+    const dir = Math.random() < .5 ? 1 : -1, g = mk("g", {}, L.fx), c = mix(isNight() ? "#05091A" : "#0F2A48", "#000000", .2);
+    const b = mk("path", { d: "M-18 0 Q-10 -5 4 -4 Q10 -3.6 15 0 Q10 3 4 3.5 Q-10 4 -18 0Z M-3 -4 L1 -14 L6 -4Z M-18 0 L-25 -8 L-21 0 L-25 7Z M6 3 L8 8 L11 3Z", fill: c, opacity: .8, transform: `scale(${dir} 1)` }, g);
+    b.animate([{ transform: `scale(${dir} 1) rotate(0deg)` }, { transform: `scale(${dir} 1) rotate(3deg)` }], { duration: 1400, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
+    const y0 = rnd(30, 90), kf = []; for (let i = 0; i <= 8; i++) kf.push({ transform: `translate(${dir > 0 ? -40 + (SW + 80) * i / 8 : SW + 40 - (SW + 80) * i / 8}px, ${y0 + Math.sin(i * .8) * 6}px)` });
+    g.animate(kf, { duration: rnd(26000, 34000), easing: "linear" }).finished.then(() => g.remove());
+  },
+  quallen() { // Quallen steigen langsam auf, nachts leuchten sie
+    const n = 2 + Math.floor(Math.random() * 3), night = isNight();
+    for (let i = 0; i < n; i++) {
+      const g = mk("g", {}, L.fx), x = rnd(SW * .08, SW * .92), s = rnd(.8, 1.5), c = ["#F7A8D8", "#A8E6F7", "#C9B6FF"][i % 3];
+      if (night) mk("circle", { r: 15, cy: -4, fill: c, opacity: .3, filter: "url(#sc-blur5)" }, g);
+      for (let k = 0; k < 5; k++) { const t = mk("path", { d: `M${-6 + k * 3} 0 q${rnd(-3, 3)} 8 ${rnd(-2, 2)} 16`, stroke: c, "stroke-width": .5, fill: "none", opacity: .7 }, g); t.animate([{ transform: "scaleY(1)" }, { transform: "scaleY(.78)" }], { duration: 1800, iterations: Infinity, direction: "alternate", easing: "ease-in-out", delay: k * 120 }); }
+      const bell = mk("path", { d: "M-9 0 Q-9 -11 0 -11 Q9 -11 9 0 Q4 2 0 1 Q-4 2 -9 0Z", fill: c, opacity: night ? .9 : .6 }, g);
+      bell.animate([{ transform: "scale(1 1)" }, { transform: "scale(1.12 .86)" }], { duration: 1800, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
+      const kf = []; for (let j = 0; j <= 10; j++) kf.push({ transform: `translate(${x + Math.sin(j * 1.1 + i) * 25}px, ${SH + 20 - (SH + 60) * j / 10}px) scale(${s})`, opacity: j === 0 || j === 10 ? 0 : 1 });
+      g.animate(kf, { duration: rnd(30000, 44000), delay: i * 2500, easing: "linear", fill: "both" }).finished.then(() => g.remove());
+    }
+  },
+  papagei() { // zwei Aras fliegen vorbei, Flügel schlagen
+    const dir = Math.random() < .5 ? 1 : -1, g = mk("g", {}, L.fx), y0 = rnd(30, 90), night = isNight();
+    [["#D93B3B", "#2E6BD9", "#F2C94C"], ["#2E6BD9", "#F2C94C", "#D93B3B"]].forEach(([c1, c2, c3], i) => {
+      const b = mk("g", { transform: `translate(${i * 26} ${i * 9}) scale(${dir} 1)` }, g), col = (c) => night ? "#101626" : c;
+      mk("path", { d: "M-10 1 L-22 5 L-20 1.5 L-22 -1 Z", fill: col(c3) }, b); // langer Schwanz
+      mk("path", { d: "M-10 0 Q-4 -3.4 4 -2.4 Q7.5 -2 8 0 Q7.5 2 4 2.4 Q-4 3.4 -10 0Z", fill: col(c1) }, b);
+      mk("path", { d: "M8 0 Q10 -2 11.5 -.5 Q11 1 9 1.2Z", fill: night ? "#101626" : "#F5F0E6" }, b);
+      const w1 = mk("path", { d: "M-2 0 Q-6 -10 8 -12 Q2 -6 1 0Z", fill: col(c2) }, b), w2 = mk("path", { d: "M-2 0 Q-6 10 8 12 Q2 6 1 0Z", fill: col(c2), opacity: .8 }, b);
+      [w1, w2].forEach((w, k) => w.animate([{ transform: `scaleY(${k ? -1 : 1})` }, { transform: `scaleY(${k ? .2 : -.2})` }], { duration: 260, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }));
+    });
+    const kf = []; for (let i = 0; i <= 10; i++) kf.push({ transform: `translate(${dir > 0 ? -60 + (SW + 120) * i / 10 : SW + 60 - (SW + 120) * i / 10}px, ${y0 + Math.sin(i * 1.5) * 10 - i * 2}px)` });
+    g.animate(kf, { duration: rnd(11000, 15000), easing: "linear" }).finished.then(() => g.remove());
+  },
+  schmetterling() { // Schmetterlinge flattern über die vorderen Blätter
+    const n = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < n; i++) {
+      const g = mk("g", {}, L.fx), c = ["#3FA7E8", "#F2B33D", "#F26B8A", "#9BE26B"][Math.floor(Math.random() * 4)], x0 = rnd(40, SW - 40), y0 = SH - 60 - rnd(0, 60);
+      const w = mk("path", { d: "M0 0 Q-5 -5 -4 -1 Q-5 3 0 1 Q5 3 4 -1 Q5 -5 0 0Z", fill: c }, g);
+      w.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(.2)" }], { duration: 160 + Math.random() * 80, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
+      const kf = []; let x = x0, y = y0; for (let k = 0; k <= 24; k++) { x += rnd(-16, 16) + (i % 2 ? 6 : -6); y += rnd(-10, 10) - 1; kf.push({ transform: `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`, opacity: k === 0 || k === 24 ? 0 : 1 }); }
+      g.animate(kf, { duration: rnd(12000, 18000), delay: i * 900, easing: "ease-in-out", fill: "both" }).finished.then(() => g.remove());
+    }
+  },
+  gluehwuermchen() { // Glühwürmchen schweben nachts durchs Unterholz
+    const g = mk("g", {}, L.fx);
+    for (let i = 0; i < 12; i++) {
+      const x0 = rnd(20, SW - 20), y0 = rnd(SH * .45, SH - 20), f = mk("g", {}, g);
+      mk("circle", { r: 5, fill: "#D6FF7A", opacity: .4, filter: "url(#sc-blur3)" }, f); const dot = mk("circle", { r: 1.2, fill: "#F2FFB0" }, f);
+      dot.animate([{ opacity: 1 }, { opacity: .1 }], { duration: 900 + Math.random() * 1400, iterations: Infinity, direction: "alternate", easing: "ease-in-out", delay: Math.random() * 1000 });
+      const kf = []; let x = x0, y = y0; for (let k = 0; k <= 14; k++) { x += rnd(-14, 14); y += rnd(-9, 9); kf.push({ transform: `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`, opacity: k === 0 || k === 14 ? 0 : 1 }); }
+      f.animate(kf, { duration: rnd(16000, 24000), delay: i * 400, easing: "ease-in-out", fill: "both" });
+    }
+    setTimeout(() => g.remove(), 32000);
+  },
   leaf() { // Blätter lösen sich aus einer Baumkrone, flattern im Wind und landen am Boden
     if (!SEASON[season].leaves && season !== "fruehling") return;
     const pal = SEASON[season].leaves ? SEASON.herbst.leaf : ["#F7D6E0", "#FFFFFF", "#F2B6C6"];
@@ -3431,7 +3713,7 @@ const EV = {
     }
   },
 };
-function randomEvent() { const nat = TH === "wald" || TH === "alpen", F = fest(); const pool = isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : []), ...(F.halloween ? ["fledermaus", "fledermaus", "fledermaus"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : []), ...(F.ostern && nat ? ["hase", "hase", "hase"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
+function randomEvent() { const nat = TH === "wald" || TH === "alpen", F = fest(); const pool = TH === "dschungel" ? (isNight() ? ["gluehwuermchen", "gluehwuermchen", "star", "sat"] : ["papagei", "schmetterling", "birds", "birds", "plane"]) : TH === "wasser" ? (isNight() ? ["quallen", "quallen", "fische", "hai"] : ["fische", "fische", "fische", "schildkroete", "hai", "quallen"]) : isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : []), ...(F.halloween ? ["fledermaus", "fledermaus", "fledermaus"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : []), ...(F.ostern && nat ? ["hase", "hase", "hase"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
 
 
 // ---------- Wetter (Open-Meteo, kein Konto, nur fester Ort Nufringen) ----------
@@ -3485,7 +3767,7 @@ function fxSize() {
   if (Math.round(r.width) !== fx.w || Math.round(r.height) !== fx.h || dpr !== fx.dpr) { fx.w = Math.round(r.width); fx.h = Math.round(r.height); fx.dpr = dpr; fxc.width = fx.w * dpr; fxc.height = fx.h * dpr; fx.parts = []; }
   return true;
 }
-const fxActive = () => on && (W.rain || W.snow || W.storm) && !document.hidden && !reduce.matches && !document.body.classList.contains("idle");
+const fxActive = () => on && TH !== "wasser" && (W.rain || W.snow || W.storm) && !document.hidden && !reduce.matches && !document.body.classList.contains("idle");
 function spawn(top) {
   const z = .25 + Math.random() * .75, snow = !!W.snow && !(W.rain && Math.random() < .5);
   return { x: Math.random() * (fx.w + 120) - 60, y: top ? Math.random() * fx.h : -20 - Math.random() * 40, z, snow, ph: Math.random() * 6.28, f: .6 + Math.random() * 1.2 };
@@ -3601,14 +3883,14 @@ sceneSync = () => {
   nextEvent();
   leafT = setInterval(() => { if (on && !quiet() && SEASON[season].leaves && Math.random() < .35) EV.leaf(); }, 60000);
   clearInterval(fwT); fwT = setInterval(() => { if (on && !quiet() && fest().feuerwerk && isNight() && Math.random() < .7) EV.feuerwerk(); }, 2600);
-  setTimeout(() => { if (on && !quiet()) fire(isNight() ? "star" : "plane"); }, 4000);
+  setTimeout(() => { if (on && !quiet()) fire(TH === "wasser" ? "fische" : TH === "dschungel" ? (isNight() ? "gluehwuermchen" : "papagei") : isNight() ? "star" : "plane"); }, 4000);
 };
 // Test-Werkzeuge fürs Design-Menü
 const skyTest = {
   weather(name) { store.set("erledigt-wetter-test", name === "echt" ? "" : name); W.cover = W.rain = W.snow = W.fog = 0; W.storm = false; loadWeather(name === "echt").then(refresh); },
   season(name) { seasonTest = name === "echt" ? null : name; built = false; refresh(); },
   fest(name) { festTest = name === "echt" ? null : name; built = false; refresh(); if (festTest === "silvester") [0, 700, 1500].forEach((t) => setTimeout(() => EV.feuerwerk(), t)); if (festTest === "ostern") setTimeout(() => EV.hase(), 400); if (festTest === "halloween") setTimeout(() => EV.fledermaus(), 400); },
-  event() { if (on) fire(isNight() ? ["star", "sat", "plane", "reh"][Math.floor(Math.random() * 4)] : ["plane", "birds", "reh", "leaf"][Math.floor(Math.random() * 4)]); },
+  event() { if (on) randomEvent(); },
   day() { // ganzer Tag in 15 Sekunden
     if (!on) return; cancelAnimationFrame(playing); const t0 = performance.now();
     const step = (t) => { const k = Math.min(1, (t - t0) / 15000), m = Math.round(300 + k * 1110); draw(m); if (k < 1) playing = requestAnimationFrame(step); else { playing = 0; refresh(); } };
