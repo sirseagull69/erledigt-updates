@@ -88,6 +88,8 @@ openSet = function () {
     <h3 class="set-h">Himmel oben</h3>
     <label class="set-row"><span>Landschaft mit Wetter</span><input type="checkbox" id="ex-scene" class="sw" ${design.w.scene ? "checked" : ""}></label>
     <div class="set-row col"><span>Wetter-Ort: <b id="ex-cur">${esc(pl.name)}</b></span><span class="set-place"><input id="ex-ort" placeholder="Stadt suchen …" enterkeyhint="search"><button type="button" class="btn" id="ex-find">Suchen</button></span><span class="set-hits" id="ex-hits"></span></div>
+    <h3 class="set-h">App</h3>
+    <div class="set-row"><span>Neueste Version holen</span><button type="button" class="btn" id="ex-upd" style="padding:8px 14px;font-size:15px">Aktualisieren</button></div>
     <h3 class="set-h">Konto</h3>`;
   $("set").querySelector("h2").insertAdjacentHTML("afterend", html);
 };
@@ -105,6 +107,7 @@ $("set").addEventListener("click", (e) => {
   const p = e.target.closest("[data-preset]");
   if (p) { design.preset = p.dataset.preset; saveDesign(); applyDesign(); document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(b === p))); return; }
   if (e.target.id === "ex-find") { placeFind(); return; }
+  if (e.target.id === "ex-upd") { forceUpdate(e.target); return; }
   const pl = e.target.closest("[data-place]");
   if (pl) { design.place = JSON.parse(pl.dataset.place); $("ex-cur").textContent = design.place.name; $("ex-hits").innerHTML = ""; $("ex-ort").value = ""; saveDesign(); window.__scene?.reloadWeather?.(); }
 });
@@ -117,6 +120,23 @@ $("set").addEventListener("change", (e) => {
 });
 $("set").addEventListener("keydown", (e) => { if (e.target.id === "ex-ort" && e.key === "Enter") { e.preventDefault(); placeFind(); } });
 document.addEventListener("click", (e) => { if (e.target.closest("#feier")) { openSet(); setTimeout(() => $("set-work")?.scrollIntoView({ block: "start", behavior: "smooth" }), 80); } });
+
+// ---------- Update von Hand: Cache leeren, alles frisch laden ----------
+async function forceUpdate(btn) {
+  btn.disabled = true; btn.textContent = "Lädt …";
+  try {
+    const files = ["./", "index.html", "app.css", "app.js", "shared.js", "extras.js", "scene.js", "vendor/supabase.js", "manifest.webmanifest", "sw.js"];
+    await Promise.all(files.map((f) => fetch(f, { cache: "reload" }).catch(() => {})));
+    if ("serviceWorker" in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    if (window.caches) for (const k of await caches.keys()) await caches.delete(k);
+  } catch {}
+  location.replace(location.pathname + "?v=" + Date.now());
+}
+// Neue Version übernimmt → einmal neu laden, damit man sie sofort sieht
+if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (!reloaded) { reloaded = true; location.reload(); } });
+}
 
 // ---------- Einhängen ----------
 const render0 = render;
