@@ -16,3 +16,28 @@ body.web .nav-foot, body.web nav > .ver, body.web nav > .account { opacity: 1; }
   body.web.has-scene .hero .hello { padding-top: calc(68px + env(safe-area-inset-top, 0px)); }
   body.web .hero h1 { font-size: 40px; }
 }
+/* ---------- Touch: ruhige, eindeutige Steuerung (PC-Look bleibt) ---------- */
+/* Kein Doppeltipp-Zoom, keine 300-ms-Verzögerung, kein blaues Aufblitzen */
+body.web { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+@media (hover: none) {
+  /* Kleine Knöpfe in der Aufgabenzeile (Liste/Datum/Priorität) sind am Handy nur Anzeige – vorher hat ein Tipp z. B. die Liste gewechselt */
+  body.web .task .meta button, body.web .task .meta [data-act] { pointer-events: none; }
+  /* Unsichtbarer Löschknopf weg – gelöscht wird per Wischen nach links oder in den Details */
+  body.web .task .trash { display: none; }
+  /* Ganze Zeile ist die Tippfläche fürs Öffnen */
+  body.web .task { cursor: pointer; }
+  body.web .task .body { min-height: 44px; }
+  /* Listen in der Seitenleiste: größere Tippflächen */
+  body.web #lists button { min-height: 44px; }
+  /* Details: volle Höhe, PC-Kram aus */
+  body.web .drawer { width: 100%; top: 0; bottom: 0; height: auto; max-height: none; border-left: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body.web .drawer [data-d="ai"] { display: none !important; }
+  /* Bilder-Feld: am Handy heißt es einfach „Foto hinzufügen“ (öffnet Kamera/Galerie) statt „Strg+V … ziehen“ */
+  body.web .drawer #drop { font-size: 0; padding-block: 14px; }
+  body.web .drawer #drop::after { content: "+ Foto hinzufügen"; font-size: 15px; font-weight: 600; }
+  /* Wischen: Zeile folgt dem Finger, dahinter Farbe + Text */
+  body.web .task { position: relative; transition: transform .22s ease; }
+  body.web .task.sw-drag { transition: none; }
+  body.web .task.sw-r { box-shadow: -400px 0 0 0 #16A34A inset; }
+  body.web .task.sw-l { box-shadow: 400px 0 0 0 #DC2626 inset; }
+}

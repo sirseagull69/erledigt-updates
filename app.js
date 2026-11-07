@@ -3824,4 +3824,40 @@ if (!window.desktop) {
   if (qTask) { history.replaceState(null, "", location.pathname); openFromPush(qTask); }
 }
 
+// ---------- Touch-Steuerung (Handy): Zeile antippen = Details, Wischen rechts = erledigt, links = löschen ----------
+if (!window.desktop && matchMedia("(hover: none)").matches) {
+  // Doppeltipp-Umbenennen aus (am Handy versehentlich; umbenennen geht im Detail-Titel)
+  $("tasks").addEventListener("dblclick", (e) => e.stopImmediatePropagation(), true);
+  // Tipp irgendwo auf die Zeile (außer Kreis) öffnet die Details
+  $("tasks").addEventListener("click", (e) => {
+    if (swiped) { e.stopImmediatePropagation(); e.preventDefault(); return; }
+    const row = e.target.closest(".task"); if (!row || e.target.closest(".tick") || e.target.closest(".title")) return;
+    if (e.target.closest(".pop, input, textarea")) return;
+    e.stopImmediatePropagation(); selected = row.dataset.id; openDetail(row.dataset.id);
+  }, true);
+  let sw = null, swiped = false;
+  $("tasks").addEventListener("touchstart", (e) => {
+    const row = e.target.closest(".task"); if (!row || e.touches.length !== 1 || e.target.closest(".tick, input, textarea")) { sw = null; return; }
+    sw = { row, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, lock: null }; swiped = false;
+  }, { passive: true });
+  $("tasks").addEventListener("touchmove", (e) => {
+    if (!sw) return;
+    const dx = e.touches[0].clientX - sw.x, dy = e.touches[0].clientY - sw.y;
+    if (sw.lock === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) sw.lock = Math.abs(dx) > Math.abs(dy) * 1.4 ? "x" : "y";
+    if (sw.lock !== "x") return;
+    sw.dx = dx; swiped = true; sw.row.classList.add("sw-drag");
+    sw.row.style.transform = `translateX(${dx}px)`;
+    sw.row.classList.toggle("sw-r", dx > 30); sw.row.classList.toggle("sw-l", dx < -30);
+  }, { passive: true });
+  const swEnd = () => {
+    if (!sw) return; const { row, dx } = sw, id = row.dataset.id; sw = null;
+    row.classList.remove("sw-drag");
+    if (dx > 100) { navigator.vibrate?.(12); completeTask(id); }
+    else if (dx < -120) { navigator.vibrate?.(12); deleteTask(id); }
+    row.style.transform = ""; setTimeout(() => row.classList.remove("sw-r", "sw-l"), 220);
+    setTimeout(() => (swiped = false), 60);
+  };
+  $("tasks").addEventListener("touchend", swEnd); $("tasks").addEventListener("touchcancel", swEnd);
+}
+
 })();
