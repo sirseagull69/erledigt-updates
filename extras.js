@@ -69,7 +69,8 @@ function applyDesign() {
   if (p.vd) D += p.vd;
   let el = $("design-css");
   if (!el) { el = document.createElement("style"); el.id = "design-css"; document.head.appendChild(el); }
-  el.textContent = `:root{${L}}@media (prefers-color-scheme: dark){:root{${D}}}`;
+  el.textContent = `:root{${L}}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${D}}}:root[data-theme="dark"]{${D}}`;
+  if (design.theme === "light" || design.theme === "dark") document.documentElement.dataset.theme = design.theme; else delete document.documentElement.dataset.theme;
   // Statusleiste in der Hintergrundfarbe
   requestAnimationFrame(() => { const bg = getComputedStyle(document.body).backgroundColor; document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", bg)); });
 }
@@ -81,6 +82,8 @@ openSet = function () {
   const pl = design.place || { name: "Nufringen" }, noJob = !design.end;
   const sw = Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="swatch" data-preset="${k}" aria-pressed="${design.preset === k}" style="--a:${p.a};--b:${p.ad}"><i></i><span>${p.name}</span></button>`).join("");
   const html = `
+    <h3 class="set-h">Hell oder dunkel</h3>
+    <div class="modes" id="ex-theme">${[["system", "Wie Handy"], ["light", "Hell"], ["dark", "Dunkel"]].map(([k, n]) => `<button type="button" data-theme-opt="${k}" aria-pressed="${(design.theme || "system") === k}">${n}</button>`).join("")}</div>
     <h3 class="set-h">Farbe</h3><div class="swatches">${sw}</div>
     <h3 class="set-h" id="set-work">Arbeitszeit</h3>
     <div class="set-row"><span>Von – bis</span><span class="set-time"><input type="time" id="ex-von" value="${esc(arbeitsbeginn())}" ${noJob ? "disabled" : ""}> – <input type="time" id="ex-bis" value="${esc(design.end || "16:30")}" ${noJob ? "disabled" : ""}></span></div>
@@ -106,6 +109,8 @@ const changed = () => { saveDesign(); feierUpdate(); if (typeof sceneSync === "f
 $("set").addEventListener("click", (e) => {
   const p = e.target.closest("[data-preset]");
   if (p) { design.preset = p.dataset.preset; saveDesign(); applyDesign(); document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(b === p))); return; }
+  const th = e.target.closest("[data-theme-opt]");
+  if (th) { design.theme = th.dataset.themeOpt; saveDesign(); applyDesign(); document.querySelectorAll("[data-theme-opt]").forEach((b) => b.setAttribute("aria-pressed", String(b === th))); return; }
   if (e.target.id === "ex-find") { placeFind(); return; }
   if (e.target.id === "ex-upd") { forceUpdate(e.target); return; }
   const pl = e.target.closest("[data-place]");

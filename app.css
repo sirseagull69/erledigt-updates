@@ -8,8 +8,9 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #14121A; --card: #1E1B26; --chip: #282433; --line: #2E2A3A; --fg: #F2F0F5; --muted: #A49FAE; --faint: #6C6678; --shadow: 0 6px 24px rgb(0 0 0 / .35); color-scheme: dark; }
+  :root:not([data-theme="light"]) { --bg: #14121A; --card: #1E1B26; --chip: #282433; --line: #2E2A3A; --fg: #F2F0F5; --muted: #A49FAE; --faint: #6C6678; --shadow: 0 6px 24px rgb(0 0 0 / .35); color-scheme: dark; }
 }
+:root[data-theme="dark"] { --bg: #14121A; --card: #1E1B26; --chip: #282433; --line: #2E2A3A; --fg: #F2F0F5; --muted: #A49FAE; --faint: #6C6678; --shadow: 0 6px 24px rgb(0 0 0 / .35); color-scheme: dark; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 var(--font); }
 body { min-height: 100dvh; overscroll-behavior-y: contain; }
