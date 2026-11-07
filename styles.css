@@ -1003,3 +1003,9 @@ body.fokus .hero .hello > *, body.fokus .hero-icons, body.fokus .hero .hello::be
 .fokus-btn:hover { background: rgb(255 255 255 / .34); }
 .fokus-btn.primary { background: var(--accent); }
 .fokus-btn.primary:hover { filter: brightness(1.1); }
+/* Landschaft reicht hinter die Listen (nur dunkel – im hellen Modus wäre dunkle Schrift auf dunklen Bäumen schlecht lesbar).
+   Der Kopf liegt über der Seite (z 20), deshalb kommen Listen und Aufgaben darüber; das Mitteilungen-Fenster bleibt oben. */
+body.has-scene .app > :not(.hero) { position: relative; z-index: 21; }
+body.has-scene .hero:has(.inbox:not([hidden])) { z-index: 40; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.has-scene:not(.scene-flach):not(.fokus) .hero .sc { bottom: -28vh; -webkit-mask-image: linear-gradient(#000 58%, transparent); mask-image: linear-gradient(#000 58%, transparent); } }
+:root[data-theme="dark"] body.has-scene:not(.scene-flach):not(.fokus) .hero .sc { bottom: -28vh; -webkit-mask-image: linear-gradient(#000 58%, transparent); mask-image: linear-gradient(#000 58%, transparent); }

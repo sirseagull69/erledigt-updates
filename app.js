@@ -1230,7 +1230,7 @@ document.addEventListener("keydown", (e) => { if (fokus && e.key === "Escape") {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
-  "2.7.4": ["Kein Hinweis-Fenster mehr beim Wechsel zwischen Arbeit und Privat", "Handy: gleiche Oberfläche wie am PC"],
+  "2.7.4": ["Im dunklen Modus reicht die Landschaft bis hinter die Listen – weniger leere Fläche", "Kein Hinweis-Fenster mehr beim Wechsel zwischen Arbeit und Privat", "Handy: gleiche Oberfläche wie am PC"],
   "2.7.3": ["Fokus-Modus: Taste F auf einer Aufgabe (oder ◎ im Detail) – die Landschaft füllt das ganze Fenster, dazu nur die eine Aufgabe und ein 25-Minuten-Timer mit Pause und +5 Min", "Esc oder „Fokus beenden“ bringt dich zurück"],
   "2.7.2": ["Erinnern vor dem Termin: Pünktlich, 5, 15, 30 oder 60 Min vorher (Einstellungen → Arbeitstag) – gilt auch fürs Handy", "Schalter „Große Landschaft“ in den Einstellungen: aus = schmales Band wie früher"],
   "2.7.1": ["Heller Modus: weicher, kurzer Übergang unter der Landschaft"],
