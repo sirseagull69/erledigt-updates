@@ -4,7 +4,11 @@
 // Kalender-Knopf im Kopf statt Tab-Leiste
 $("cal-btn").addEventListener("click", () => { tab = tab === "cal" ? "list" : "cal"; render(); });
 const render1 = render;
-render = function () { render1(); $("cal-btn").setAttribute("aria-pressed", String(tab === "cal")); };
+render = function () {
+  render1(); $("cal-btn").setAttribute("aria-pressed", String(tab === "cal"));
+  const d = parseIso(calSel);
+  $("add-in").placeholder = tab === "cal" ? `Was ist am ${d.getDate()}.${d.getMonth() + 1}.?` : "Was steht an?";
+};
 
 // Eingabezeile
 const comp = $("composer"), inp = $("add-in");
