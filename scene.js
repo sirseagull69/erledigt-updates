@@ -2,7 +2,7 @@
 // ======================================================================
 // ---------- Himmel im Kopfbereich (Schwarzwald, Tageslauf, Wetter) ----------
 // ======================================================================
-// Die Sonne läuft vom Arbeitsbeginn (7:30) bis zur Feierabend-Zeit über den Himmel und geht dann hinter den Bergen unter.
+// Die Sonne läuft vom echten Sonnenaufgang bis zum Sonnenuntergang (Open-Meteo, Wetter-Ort) über den Himmel.
 // Jahreszeit + Mondphase vom echten Datum, Wetter (Regen, Schnee, Wolken, Nebel, Gewitter) von Open-Meteo für Nufringen.
 // Alles in einer eigenen Funktion, damit die Namen nicht mit dem Rest kollidieren. applyDesign() ruft sceneSync().
 var sceneSync = null;
@@ -296,12 +296,9 @@ async function loadWeather(force) {
 // ---------- Uhr, Ereignisse, Ein/Aus ----------
 function placeNow() { try { const p = design.place; if (p && isFinite(p.lat) && isFinite(p.lon)) return p; } catch {} return { name: "Nufringen", lat: 48.62, lon: 8.89 }; }
 function minuteNow() {
-  const n = new Date(), wd = n.getDay(), toM = (s) => { const [h, mi] = String(s).split(":").map(Number); return (h || 0) * 60 + (mi || 0); };
-  const ov = workToday();
-  if (false && ov) { SC_START = toM(ov.start); SC_END = Math.max(toM(ov.end), SC_START + 60); }
-  else if (true) { SC_START = W.sunrise || 450; SC_END = W.sunset || 1020; } // privat: echter Sonnenauf- und -untergang
-  else if (wd === 0 || wd === 6) { SC_START = 540; SC_END = 1080; } // Wochenende: 9–18 Uhr
-  else { SC_START = toM(arbeitsbeginn()); SC_END = toM(feierabendAt()); if (SC_END - SC_START < 60) SC_END = SC_START + 60; }
+  // Sonne nach echtem Sonnenauf- und -untergang am Wetter-Ort – in Arbeit und Privat gleich
+  const n = new Date();
+  SC_START = W.sunrise || 450; SC_END = Math.max(W.sunset || 1020, SC_START + 60);
   return Math.max(300, Math.min(1410, n.getHours() * 60 + n.getMinutes()));
 }
 // Filmkorn einmal als Bild erzeugen
