@@ -277,7 +277,7 @@ function openSet() {
   $("set").innerHTML = `<h2 style="margin:4px 0">Einstellungen</h2>
     <div class="set-row"><span>Angemeldet als</span><b style="overflow:hidden;text-overflow:ellipsis">${esc(session?.user?.email || "")}</b></div>
     ${/ErledigtAndroid/.test(navigator.userAgent) ? "" : `<div class="set-row"><span>Auf den Home-Bildschirm</span><span class="muted" style="text-align:right;font-size:14px">iPhone: Teilen → „Zum Home-Bildschirm“</span></div>`}
-    <div class="set-row"><span>Version</span><span class="muted">mobil 3.3${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
+    <div class="set-row"><span>Version</span><span class="muted">mobil 3.4${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
     <button type="button" class="btn danger wide" id="logout">Abmelden</button>`;
   $("set-wrap").hidden = false;
 }
@@ -291,9 +291,14 @@ document.querySelectorAll(".sheet-wrap").forEach((w) => {
   // Seitliches Wischen (Farb-/Landschaftsreihen), Schieberegler und Textfelder bleiben unberührt.
   const sh = w.querySelector(".sheet"); let g = null;
   const close = () => { if (w.id === "det-wrap") saveDetFields(); closeSheet(w); };
+  // Kopfleiste oben (bleibt beim Scrollen stehen): Griff zum Runterziehen + Schließen-Knopf
+  const grab = sh.querySelector(".grab"), top = document.createElement("div"); top.className = "sh-top";
+  grab.replaceWith(top); top.appendChild(grab);
+  const x = document.createElement("button"); x.type = "button"; x.className = "sh-x"; x.setAttribute("aria-label", "Schließen"); x.textContent = "×";
+  x.addEventListener("click", close); top.appendChild(x);
   sh.addEventListener("touchstart", (e) => {
     if (e.touches.length !== 1) { g = null; return; }
-    const t = e.target, onGrab = !!t.closest(".grab");
+    const t = e.target; if (t.closest(".sh-x")) { g = null; return; } const onGrab = !!t.closest(".sh-top");
     if (!onGrab && t.closest("input[type=range], textarea, input:not([type=checkbox]):not([type=radio]), select, [contenteditable]")) { g = null; return; }
     g = { y0: e.touches[0].clientY, x0: e.touches[0].clientX, t0: Date.now(), dy: 0, lock: onGrab ? "y" : null, top: sh.scrollTop <= 0, onGrab, lastY: e.touches[0].clientY, lastT: Date.now(), v: 0 };
   }, { passive: true });
@@ -303,11 +308,12 @@ document.querySelectorAll(".sheet-wrap").forEach((w) => {
     if (g.lock === null) {
       if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
       // nur nach unten ziehen, wenn ganz oben – sonst normal scrollen
-      g.lock = Math.abs(dy) > Math.abs(dx) && dy > 0 && g.top && sh.scrollTop <= 0 ? "y" : "no";
+      g.lock = e.cancelable && Math.abs(dy) > Math.abs(dx) && dy > 0 && g.top && sh.scrollTop <= 0 ? "y" : "no";
       if (g.lock === "y") { g.y0 = y; sh.style.transition = "none"; w.style.transition = "none"; }
     }
     if (g.lock !== "y") return;
-    e.preventDefault();
+    if (g.onGrab && !g.started) { g.started = true; sh.style.transition = "none"; w.style.transition = "none"; }
+    if (e.cancelable) e.preventDefault();
     const d = y - g.y0; g.dy = d;
     const now = Date.now(); g.v = (y - g.lastY) / Math.max(1, now - g.lastT); g.lastY = y; g.lastT = now;
     sh.style.transform = `translateY(${d > 0 ? d : d / 6}px)`;
