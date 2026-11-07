@@ -1,13 +1,13 @@
 # Erledigt – Download
 
-Persönliche To-do-App. Hier liegen nur die fertigen Installer, kein Quellcode.
+Persönliche To-do-App. Hier liegen nur die fertigen Installer (unter **Releases**), kein Quellcode.
 
 ## ⬇️ Aktuelle Version: 2.6.5
 
 | System | Datei |
 |---|---|
-| **Windows** | [Erledigt-Setup-2.6.5.exe](https://raw.githubusercontent.com/sirseagull69/erledigt-updates/main/Erledigt-Setup-2.6.5.exe) |
-| **Mac** (Apple-Chip: MacBook Neo, M1/M2/M3/M4 …) | [Erledigt-mac-arm64-2.6.5.zip](https://raw.githubusercontent.com/sirseagull69/erledigt-updates/main/Erledigt-mac-arm64-2.6.5.zip) |
+| **Windows** | [Erledigt-Setup-….exe](https://github.com/sirseagull69/erledigt-updates/releases/latest) |
+| **Mac** (Apple-Chip: MacBook Neo, M1/M2/M3/M4 …) | [Erledigt-mac-arm64-….zip](https://github.com/sirseagull69/erledigt-updates/releases/latest) |
 | **Android** | [Erledigt-Android.apk](https://raw.githubusercontent.com/sirseagull69/erledigt-updates/main/Erledigt-Android.apk) |
 | **iPhone** | [sirseagull69.github.io/erledigt-updates](https://sirseagull69.github.io/erledigt-updates/) im Safari öffnen |
 
