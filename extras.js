@@ -48,7 +48,7 @@ function feierabendText() {
 const CLOCK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 function feierUpdate() {
   let el = $("feier");
-  if (!el) { el = document.createElement("button"); el.type = "button"; el.id = "feier"; el.className = "feier"; document.querySelector(".top").appendChild(el); }
+  if (!el) { el = document.createElement("div"); el.id = "feier"; el.className = "feier"; document.querySelector(".top").appendChild(el); }
   const f = feierabendText();
   el.hidden = !f; if (!f) return;
   el.classList.toggle("party", !!f.party);
@@ -136,7 +136,7 @@ $("set").addEventListener("change", (e) => {
   else if (id === "ex-scene") { design.w.scene = e.target.checked; changed(); }
 });
 $("set").addEventListener("keydown", (e) => { if (e.target.id === "ex-ort" && e.key === "Enter") { e.preventDefault(); placeFind(); } });
-document.addEventListener("click", (e) => { if (e.target.closest("#feier")) { openSet(); setTimeout(() => $("set-work")?.scrollIntoView({ block: "start", behavior: "smooth" }), 80); } });
+// Feierabend-Zeile ist nur Anzeige – Einstellungen gibt es über das Zahnrad
 
 // ---------- Update von Hand: Cache leeren, alles frisch laden ----------
 async function forceUpdate(btn) {
