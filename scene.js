@@ -11,7 +11,7 @@ if (MINI) return;
 const hdr = document.querySelector("main > header"); if (!hdr) return;
 const box = document.createElement("div"); box.className = "sc"; box.setAttribute("aria-hidden", "true");
 box.innerHTML = '<svg viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><svg class="sc-move" viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><div class="sc-grain"></div><div class="sc-rain"></div><div class="sc-snow"></div><div class="sc-flash"></div>';
-(hdr.querySelector(".hello") || hdr).prepend(box);
+(document.querySelector(".hello") || hdr).prepend(box);
 const svg = box.querySelector("svg"), mv = box.querySelector(".sc-move"), precip = { rain: box.querySelector(".sc-rain"), snow: box.querySelector(".sc-snow") };
 var SC_START = 450, SC_END = 990, SW = 900; // SW: Breite der Szene, passend zum Banner (nichts wird gestreckt oder abgeschnitten)
 const W = { cover: 0, rain: 0, snow: 0, fog: 0, storm: false, sunrise: 0, sunset: 0 }; // sunrise/sunset in Minuten (vom Wetterdienst)
@@ -52,6 +52,11 @@ const LAYERS = [ // seed, Grundlinie, Höhe, Rauheit, Tannen
   [11, 126, 30, 1.2, 0], [23, 140, 24, 1.4, 0], [37, 152, 22, 1.6, .3], [51, 170, 18, 1.8, .5], [64, 194, 12, 2, .68],
 ];
 let L = {}, layerEls = [], leafEls = [];
+// Landschaften: wald (Schwarzwald), alpen, kueste, stadt, schlicht – Auswahl im Design-Menü
+const THEMES = ["wald", "alpen", "kueste", "stadt", "schlicht"];
+const theme = () => { try { return THEMES.includes(design.scene) ? design.scene : "wald"; } catch { return "wald"; } };
+const LAYERS_ALP = [[11, 112, 64, 1, 0], [23, 132, 50, 1.2, 0], [37, 152, 26, 1.6, .3], [51, 172, 16, 1.8, .5], [64, 194, 10, 2, .68]];
+let TH = "wald";
 function build() {
   svg.innerHTML = ""; mv.innerHTML = ""; layerEls = []; L.crownPts = [];
   const se = SEASON[season];
@@ -97,8 +102,14 @@ function build() {
   L.towerLight = null; L.lights = [];
   leafEls = []; L.lights = []; L.smoke = null;
   const HOUSE = Math.round(SW * .33), LAKE = [Math.round(SW * .46), Math.round(SW * .46) + 200]; L.lake = LAKE;
-  LAYERS.forEach(([seed, base, amp, rough, pines], i) => {
-    const pts = ridgePts(seed, base, amp, rough, i <= 1);
+  TH = theme();
+  L.shimmer = null; L.frontPts = null; L.beam = null;
+  if (TH === "kueste") buildCoast(defs);
+  else if (TH === "stadt") buildCity(defs);
+  else if (TH === "schlicht") buildPlain();
+  else (TH === "alpen" ? LAYERS_ALP : LAYERS).forEach(([seed, base, amp, rough, pines], i) => {
+    const alp = TH === "alpen";
+    const pts = ridgePts(seed, base, amp, rough, alp ? i <= 2 : i <= 1);
     if (i === 4) pts.forEach((q) => { if (q[0] > LAKE[0] - 30 && q[0] < LAKE[1] + 30) q[1] += 14 * Math.sin(Math.PI * Math.max(0, Math.min(1, (q[0] - LAKE[0] + 30) / (LAKE[1] - LAKE[0] + 60)))); });
     let d = `M-10 210 L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} 210Z`;
     const R = seeded(seed * 3), crowns = [];
@@ -111,7 +122,7 @@ function build() {
         else if (i >= 3 && r < pines * .62 + .2) { const h = (8 + R() * 9) * (1 + (i - 2) * .22); d += ` M${x - .6} ${y + 2} V${y - h * .45} H${x + .6} V${y + 2}Z`; crowns.push([x, y - h * .62, h, Math.floor(R() * 5), R()]); }
       }
     }
-    if (i === 3) { // Schwarzwaldhaus: riesiges Walmdach, fast bis zum Boden
+    if (i === 3 && !alp) { // Schwarzwaldhaus: riesiges Walmdach, fast bis zum Boden
       const q = pts.find((t) => t[0] >= HOUSE), x = q[0], y = q[1] + 6;
       d += ` M${x - 15} ${y + 4} L${x - 15} ${y - 4} L${x - 19} ${y - 3} L${x - 7} ${y - 17} L${x + 9} ${y - 17} L${x + 21} ${y - 3} L${x + 17} ${y - 4} L${x + 17} ${y + 4}Z M${x + 5} ${y - 17} L${x + 5} ${y - 21} L${x + 8} ${y - 21} L${x + 8} ${y - 15}Z`;
       L.house = [x, y];
@@ -129,13 +140,13 @@ function build() {
       const w = h * (.28 + v * .1), c = mk("g", {}, g);
       [[0, 0, w, h * .4], [-w * .45, h * .12, w * .7, h * .28], [w * .45, h * .08, w * .72, h * .3], [w * .1 * (v - .5), -h * .22, w * .7, h * .26]].forEach(([dx, dy, rx, ry]) => mk("ellipse", { cx: x + dx, cy: y + dy, rx, ry }, c));
       leafEls.push([c, i, ci]); L.crownPts.push([x, y, h, i, ci]); });
-    if (se.snow && i <= 1) {
+    if ((se.snow || alp) && i <= 1) {
       const gr = mk("linearGradient", { id: "sc-snow" + i, x1: 0, y1: 0, x2: 0, y2: 1, gradientUnits: "userSpaceOnUse" }, defs);
       gr.setAttribute("y1", base - amp * 1.4); gr.setAttribute("y2", base + 6);
       mk("stop", { offset: 0, "stop-color": "#F4F7FB" }, gr); mk("stop", { offset: .38, "stop-color": "#E6ECF3" }, gr); mk("stop", { offset: .62, class: "snowbase" }, gr);
       p.dataset.snow = i;
     }
-    if (i === 3) { // Fenster + Kaminrauch am Schwarzwaldhaus
+    if (i === 3 && !alp) { // Fenster + Kaminrauch am Schwarzwaldhaus
       const [x, y] = L.house;
       [[-11, -3], [-6, -3], [6, -3], [11, -3], [-2, -11]].forEach(([dx, dy], j) => { const w = mk("rect", { x: x + dx - 1.4, y: y + dy - 1.2, width: 2.8, height: 2.4, fill: "#FFC96E" }); L.lights.push([w, j * .04]); });
       L.smoke = mk("g", {}, mv);
@@ -149,10 +160,76 @@ function build() {
       for (let j = 0; j < Math.ceil(SW / 190); j++) mk("ellipse", { cx: 80 + j * 190 + R() * 60, cy: base + 8, rx: 90 + R() * 70, ry: 7 + R() * 4, class: "fogc" }, fg);
     }
   });
+  if (!L.shimmer) L.shimmer = mk("g", {}, mv);
   L.fx = mk("g", {}, mv);
   // Filmkorn
   draw(cur);
 }
+
+// Nebelbänke zwischen Schichten (für alle Landschaften)
+function fogBand(base, R) { const fg = mk("g", { filter: "url(#sc-blur8)" }); for (let j = 0; j < Math.ceil(SW / 190); j++) mk("ellipse", { cx: 80 + j * 190 + R() * 60, cy: base + 8, rx: 90 + R() * 70, ry: 7 + R() * 4, class: "fogc" }, fg); }
+const layer = (d) => { const g = mk("g", {}), p = mk("path", { d }, g); layerEls.push(p); return p; };
+const ridgeD = (pts) => `M-10 210 L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} 210Z`;
+
+// ---------- Küste: Landzungen, Meer mit Glitzern, Leuchtturm auf der Klippe ----------
+function buildCoast() {
+  const R = seeded(91), HZ = 124; // Horizont höher, damit das Meer im weichen Auslauf noch sichtbar ist
+  layer(ridgeD(ridgePts(11, HZ - 14, 14, .8, false).map(([x, y]) => [x, x > SW * .58 ? y : HZ + 2 + (y - HZ) * .2]))); fogBand(HZ - 14, R);
+  layer(ridgeD(ridgePts(23, HZ - 4, 9, 1, false).map(([x, y]) => [x, x < SW * .28 ? y : HZ + 2]))); fogBand(HZ - 6, R);
+  // Meer (spiegelt den Himmel)
+  mk("rect", { x: 0, y: HZ, width: SW, height: 210 - HZ, fill: "url(#sc-lake)" });
+  L.shimmer = mk("g", {}, mv);
+  for (let j = 0; j < SW / 10; j++) { const y = HZ + 3 + Math.pow(R(), 1.4) * 70, x = R() * SW, w = 5 + (y - HZ) * .5 * R() + 3; mk("path", { d: `M${x} ${y} h${w}`, stroke: "#fff", "stroke-width": .4 + (y - HZ) / 70, "stroke-linecap": "round", class: "shim", style: `animation-delay:${R() * 3}s` }, L.shimmer); }
+  // Klippe rechts mit Leuchtturm
+  const cx = Math.round(SW * .8), top = HZ + 6;
+  let d = `M${cx - 150} 212 L${cx - 110} 186 Q${cx - 80} ${top + 6} ${cx - 44} ${top} L${cx + 60} ${top - 5} Q${cx + 110} ${top - 3} ${cx + 150} ${top + 8} L${SW + 10} ${top + 4} L${SW + 10} 212Z`;
+  d += ` M${cx - 7} ${top} L${cx - 5} ${top - 50} L${cx + 5} ${top - 50} L${cx + 7} ${top}Z M${cx - 7.5} ${top - 50} h15 v-3 h-15Z M${cx - 4.5} ${top - 53} v-8 h9 v8Z M${cx - 5.5} ${top - 61} L${cx} ${top - 67} L${cx + 5.5} ${top - 61}Z`;
+  // Häuschen am Turm
+  d += ` M${cx + 12} ${top} v-9 l7 -6 l7 6 v9Z`;
+  layer(d);
+  L.house = [cx, top];
+  [top - 14, top - 31].forEach((y) => mk("rect", { x: cx - 6.2, y, width: 12.4, height: 5, fill: "#C8473E", opacity: .85 }));
+  const lamp = mk("circle", { cx, cy: top - 57, r: 2.8, fill: "#FFE8A8" }); L.lights.push([lamp, 0]);
+  const win = mk("rect", { x: cx + 17.5, y: top - 6, width: 3, height: 3, fill: "#FFC96E" }); L.lights.push([win, .3]);
+  L.beam = mk("g", { transform: `translate(${cx} ${top - 57})`, opacity: 0 }, mv);
+  const b = mk("path", { d: "M0 0 L-320 -16 L-320 16Z", fill: "#FFF1C2", opacity: .22, filter: "url(#sc-blur3)" }, L.beam);
+  b.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(.05)" }, { transform: "scaleX(-1)" }, { transform: "scaleX(.05)" }, { transform: "scaleX(1)" }], { duration: 9000, iterations: Infinity });
+  // Segelboot draußen
+  const bx = SW * .38; layer(`M${bx - 9} ${HZ + 6} h18 l-3 3 h-12Z M${bx} ${HZ + 5} V${HZ - 12} L${bx + 8} ${HZ + 4}Z M${bx - 1} ${HZ - 10} L${bx - 7} ${HZ + 4} H${bx - 1}Z`);
+  // Dünengras vorne links
+  let g = `M-10 212 L-10 172 Q${SW * .12} 164 ${SW * .26} 180 Q${SW * .32} 188 ${SW * .36} 212Z`;
+  for (let j = 0; j < 50; j++) { const x = R() * SW * .3, y = 172 + (x / (SW * .3)) * 10 + R() * 4, h = 6 + R() * 10, lean = (R() - .3) * 5; g += ` M${x} ${y} Q${x + lean * .5} ${y - h * .6} ${x + lean} ${y - h} L${x + .9} ${y}Z`; }
+  layer(g);
+  L.frontPts = [[SW * .2, 180]]; L.lake = [SW * .2, SW * .2];
+}
+
+// ---------- Stadt: Hügel, Skyline mit Fernsehturm, Fenster gehen abends an ----------
+function buildCity() {
+  const R = seeded(57);
+  layer(ridgeD(ridgePts(11, 122, 16, 1, false))); fogBand(122, R);
+  const row = (base, minH, maxH, minW, maxW, wins, tower) => {
+    let d = "", x = -10; const rects = [];
+    while (x < SW + 10) {
+      const w = minW + R() * (maxW - minW), h = minH + R() * (maxH - minH), y = base - h;
+      d += ` M${x} ${base + 30} V${y} H${x + w} V${base + 30}Z`;
+      if (R() < .25) d += ` M${x + w * .3} ${y} V${y - 4 - R() * 6} H${x + w * .35} V${y}Z`; // Antenne
+      rects.push([x, y, w, h]); x += w + (R() < .3 ? 2 + R() * 6 : 0);
+    }
+    if (tower) { const tx = SW * .62, ty = base - maxH - 52; d += ` M${tx - 2} ${base + 30} L${tx - 1.2} ${ty + 20} L${tx + 1.2} ${ty + 20} L${tx + 2} ${base + 30}Z M${tx - 6} ${ty + 20} a6 4 0 1 0 12 0 a6 4 0 1 0 -12 0Z M${tx - .5} ${ty + 16} V${ty} H${tx + .5} V${ty + 16}Z`; const t = mk("circle", { cx: tx, cy: ty, r: 1, fill: "#FF4A4A", class: "blink" }, mv); L.towerLight = t; }
+    layer(d);
+    if (wins) rects.forEach(([x, y, w, h]) => { for (let wy = y + 4; wy < Math.min(base + 26, y + h + 24); wy += wins) for (let wx = x + 2.5; wx < x + w - 3; wx += wins * .9) if (R() < .42) { const c = mk("rect", { x: wx, y: wy, width: wins * .38, height: wins * .5, fill: R() < .8 ? "#FFD58A" : "#BFE0FF" }); L.lights.push([c, R()]); } });
+  };
+  row(140, 16, 42, 10, 22, 0, true); fogBand(140, R);
+  row(160, 12, 34, 14, 30, 5.5, false);
+  row(184, 8, 22, 18, 40, 6.5, false);
+  // Straße mit Laternen
+  layer(`M-10 212 V200 H${SW + 10} V212Z`);
+  for (let x = 20; x < SW; x += 70) { mk("rect", { x, y: 190, width: .8, height: 10, fill: "#222" }); const c = mk("circle", { cx: x + .4, cy: 190, r: 1.6, fill: "#FFE2A0" }); L.lights.push([c, 0]); }
+  L.frontPts = [[SW * .2, 200]]; L.lake = [SW * .2, SW * .2];
+}
+
+// ---------- Schlicht: nur Himmel und eine sanfte Hügelkante ----------
+function buildPlain() { const R = seeded(3); layer(ridgeD(ridgePts(11, 150, 12, .4, false))); fogBand(150, R); layer(ridgeD(ridgePts(23, 172, 8, .3, false))); L.frontPts = [[SW * .2, 196]]; L.lake = [SW * .2, SW * .2]; }
 
 // ---------- Zeichnen ----------
 let cur = 720;
@@ -169,12 +246,13 @@ function draw(m) {
     let c = mix(hor, deep, k);
     c = mix(c, se.tint, se.k * 1.8 * d * (.3 + i / 5.5));
     if (el.dataset.snow) { el.setAttribute("fill", `url(#sc-snow${el.dataset.snow})`); const st = document.querySelector(`#sc-snow${el.dataset.snow} .snowbase`); st.setAttribute("stop-color", c); document.querySelectorAll(`#sc-snow${el.dataset.snow} stop`).forEach((x, j) => { if (j < 2) x.setAttribute("stop-color", mix(["#F4F7FB", "#E6ECF3"][j], hor, .25 + night * .55)); }); }
-    else { if (i >= 2) c = mix(c, "#0F1C17", (.18 + (i - 2) * .14) * (.4 + .6 * d)); el.setAttribute("fill", c); }
+    else { if (i >= 2) c = mix(c, TH === "wald" || TH === "alpen" ? "#0F1C17" : "#0E1420", (.18 + (i - 2) * .14) * (.4 + .6 * d)); el.setAttribute("fill", c); }
     el.dataset.c = c;
   });
   leafEls.forEach(([el, li, ci]) => { const base = layerEls[li].dataset.c, pal = se.leaf; el.setAttribute("fill", pal.length ? mix(base, pal[ci % pal.length], (.3 + (li - 2) * .07) * (.08 + .92 * d)) : base); el.setAttribute("opacity", pal.length ? 1 : 0); });
   document.getElementById("sc-lk0").setAttribute("stop-color", mix(hor, "#000000", .1)); document.getElementById("sc-lk1").setAttribute("stop-color", mix(mid, "#000000", .25));
   L.shimmer.setAttribute("opacity", .25 + d * .35);
+  if (L.beam) L.beam.setAttribute("opacity", night > .5 ? .9 : 0);
   const morning = m < 620 ? Math.min(1, (620 - m) / 170) : 0;
   if (L.smoke) { L.smoke.setAttribute("opacity", .55); L.smoke.querySelectorAll("circle").forEach((c) => c.setAttribute("fill", mix(hor, "#FFFFFF", .3 * d))); }
   svg.querySelectorAll(".fogc").forEach((f) => { f.setAttribute("fill", mix(hor, "#FFFFFF", d * .25 + morning * .2)); f.setAttribute("opacity", Math.min(.95, .32 + night * .1 + morning * .4 + W.fog * .5 + ov * .15)); });
@@ -238,6 +316,7 @@ const EV = {
     g.animate([{ transform: "translate(-10px, 26px)" }, { transform: `translate(${SW + 10}px, 80px)` }], { duration: 32000, easing: "linear" }).finished.then(() => g.remove());
   },
   reh() {
+    if (!layerEls[4] || !L.frontPts) return;
     const q = L.frontPts.find((t) => t[0] >= L.lake[0] - 18) || [L.lake[0] - 18, 196], g = mk("g", {}, L.fx), c = layerEls[4].dataset.c;
     g.setAttribute("transform", `translate(${q[0]} ${q[1] + 1})`);
     const deer = mk("g", {}, g);
@@ -266,7 +345,7 @@ const EV = {
     }
   },
 };
-function randomEvent() { const pool = isNight() ? ["star", "star", "sat", "plane", "reh"] : ["plane", "plane", "birds", "birds", "reh", "leaf"]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
+function randomEvent() { const nat = TH === "wald" || TH === "alpen"; const pool = isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
 
 
 // ---------- Wetter (Open-Meteo, kein Konto, nur fester Ort Nufringen) ----------
@@ -312,7 +391,7 @@ function nextEvent() { clearTimeout(evT); evT = setTimeout(() => { if (on && !qu
 window.addEventListener("focus", () => { if (on && !quiet() && Date.now() - lastEv > 300000) setTimeout(() => { lastEv = Date.now(); randomEvent(); }, 1500); });
 function measure() { const w = box.clientWidth, h = box.clientHeight; return w && h ? Math.max(700, Math.min(2600, Math.round(210 * w / h))) : SW; }
 let seasonTest = null, playing = 0;
-function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || Math.abs(nw - SW) > 30) { season = s; SW = nw; build(); built = true; } draw(minuteNow()); }
+function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || theme() !== TH || Math.abs(nw - SW) > 30) { season = s; SW = nw; build(); built = true; } draw(minuteNow()); }
 let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); }, 250); }).observe(box); } catch {}
 sceneSync = () => {
   const want = !!design.w.scene;

@@ -89,6 +89,7 @@ openSet = function () {
     <h3 class="set-h" id="set-work">Arbeitszeit</h3>
     <div class="set-row"><span>Von – bis</span><span class="set-time"><input type="time" id="ex-von" value="${esc(arbeitsbeginn())}"> – <input type="time" id="ex-bis" value="${esc(design.end || "16:30")}"></span></div>
     <h3 class="set-h">Himmel oben</h3>
+    <div class="scene-opts">${[["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"]].map(([k, n]) => `<button type="button" data-scene="${k}" aria-pressed="${(design.scene || "wald") === k}">${n}</button>`).join("")}</div>
     <label class="set-row"><span>Landschaft mit Wetter</span><input type="checkbox" id="ex-scene" class="sw" ${design.w.scene ? "checked" : ""}></label>
     <div class="set-row col"><span>Wetter-Ort: <b id="ex-cur">${esc(pl.name)}</b></span><span class="set-place"><input id="ex-ort" placeholder="Stadt suchen …" enterkeyhint="search"><button type="button" class="btn" id="ex-find">Suchen</button></span><span class="set-hits" id="ex-hits"></span></div>
     <h3 class="set-h">App</h3>
@@ -111,6 +112,8 @@ $("set").addEventListener("click", (e) => {
   if (p) { design.preset = p.dataset.preset; saveDesign(); applyDesign(); document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(b === p))); return; }
   const th = e.target.closest("[data-theme-opt]");
   if (th) { design.theme = th.dataset.themeOpt; saveDesign(); applyDesign(); document.querySelectorAll("[data-theme-opt]").forEach((b) => b.setAttribute("aria-pressed", String(b === th))); return; }
+  const sc = e.target.closest("[data-scene]");
+  if (sc) { design.scene = sc.dataset.scene; saveDesign(); if (typeof sceneSync === "function") sceneSync(); document.querySelectorAll("[data-scene]").forEach((b) => b.setAttribute("aria-pressed", String(b === sc))); return; }
   if (e.target.id === "ex-find") { placeFind(); return; }
   if (e.target.id === "ex-upd") { forceUpdate(e.target); return; }
   const pl = e.target.closest("[data-place]");
