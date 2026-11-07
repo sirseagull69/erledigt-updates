@@ -13,7 +13,8 @@ const box = document.createElement("div"); box.className = "sc"; box.setAttribut
 box.innerHTML = '<svg viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><svg class="sc-move" viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><div class="sc-grain"></div><canvas class="sc-fx"></canvas><div class="sc-flash"></div>';
 (document.getElementById("hero") || document.querySelector(".hello") || hdr).prepend(box);
 const svg = box.querySelector("svg"), mv = box.querySelector(".sc-move"), fxc = box.querySelector(".sc-fx"), flashEl = box.querySelector(".sc-flash");
-var SC_START = 450, SC_END = 990, SW = 900; // SW: Breite der Szene, passend zum Banner (nichts wird gestreckt oder abgeschnitten)
+var SC_START = 450, SC_END = 990, SW = 900, SH = 210; // SH: Höhe der Szene (210 = Band, 300 = hoch mit Vordergrund)
+const scHoch = () => { try { return JSON.parse(localStorage.getItem("em-scene-hoch") ?? "true") !== false; } catch { return true; } }; // SW: Breite der Szene, passend zum Banner (nichts wird gestreckt oder abgeschnitten)
 const W = { cover: 0, rain: 0, snow: 0, fog: 0, storm: false, sunrise: 0, sunset: 0 }; // sunrise/sunset in Minuten (vom Wetterdienst)
 const NS = "http://www.w3.org/2000/svg";
 const mk = (tag, attrs, parent = svg) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
@@ -51,6 +52,8 @@ function ridgePts(seed, base, amp, rough, peaky) {
 const LAYERS = [ // seed, Grundlinie, Höhe, Rauheit, Tannen
   [11, 126, 30, 1.2, 0], [23, 140, 24, 1.4, 0], [37, 152, 22, 1.6, .3], [51, 170, 18, 1.8, .5], [64, 194, 12, 2, .68],
 ];
+// Vordergrund im hohen Modus: nahe Wiese mit Bäumen, ganz vorne ein Hang
+const FRONT = [[78, 236, 10, 1.5, .4], [91, 274, 8, 1.3, .26]];
 let L = {}, layerEls = [], leafEls = [];
 // Landschaften: wald (Schwarzwald), alpen, kueste, stadt, schlicht – Auswahl im Design-Menü
 const THEMES = ["wald", "alpen", "kueste", "stadt", "schlicht"];
@@ -67,7 +70,7 @@ function alpPts(seed, base, amp, rough) {
 }
 let TH = "wald";
 function build() {
-  svg.innerHTML = ""; mv.innerHTML = ""; layerEls = []; L.crownPts = [];
+  svg.innerHTML = ""; mv.innerHTML = ""; layerEls = []; L.crownPts = []; SH = scHoch() ? 300 : 210;
   const se = SEASON[season];
   const defs = mk("defs", {});
   defs.innerHTML = `
@@ -88,8 +91,8 @@ function build() {
   <filter id="sc-blur8" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="8"/></filter>
   <filter id="sc-blur3" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
   <filter id="sc-grain"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 .55 0"/></filter>`;
-  svg.setAttribute("viewBox", `0 0 ${SW} 210`); mv.setAttribute("viewBox", `0 0 ${SW} 210`); box.style.setProperty("--sw", SW);
-  mk("rect", { x: 0, y: 0, width: SW, height: 210, fill: "url(#sc-sky)" });
+  svg.setAttribute("viewBox", `0 0 ${SW} ${SH}`); mv.setAttribute("viewBox", `0 0 ${SW} ${SH}`); box.style.setProperty("--sw", SW);
+  mk("rect", { x: 0, y: 0, width: SW, height: SH, fill: "url(#sc-sky)" });
   // Sterne
   L.stars = mk("g", {});
   const SR = seeded(7);
@@ -124,14 +127,15 @@ function build() {
   if (TH === "kueste") buildCoast(defs);
   else if (TH === "stadt") buildCity(defs);
   else if (TH === "schlicht") buildPlain();
-  else (TH === "alpen" ? LAYERS_ALP : LAYERS).forEach(([seed, base, amp, rough, pines], i) => {
+  else (TH === "alpen" ? LAYERS_ALP : LAYERS).concat(SH > 210 ? FRONT : []).forEach(([seed, base, amp, rough, pines], i) => {
     const alp = TH === "alpen";
     const pts = alp && i <= 1 ? alpPts(seed, base, amp, rough) : ridgePts(seed, base, amp, rough, alp ? i <= 2 : i <= 1);
+    if (i === 5) pts.forEach((q) => { if (q[0] > LAKE[0] - 60 && q[0] < LAKE[1] + 60) q[1] += 18 * Math.sin(Math.PI * Math.max(0, Math.min(1, (q[0] - LAKE[0] + 60) / (LAKE[1] - LAKE[0] + 120)))); }); // Senke: Blick auf den See bleibt frei
     if (i === 4) pts.forEach((q) => { if (q[0] > LAKE[0] - 30 && q[0] < LAKE[1] + 30) q[1] += 14 * Math.sin(Math.PI * Math.max(0, Math.min(1, (q[0] - LAKE[0] + 30) / (LAKE[1] - LAKE[0] + 60)))); });
-    let d = `M-10 210 L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} 210Z`;
+    let d = `M-10 ${SH} L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} ${SH}Z`;
     if (alp && i === 1) { const right = pts.filter((t) => t[0] > SW * .55 && t[0] < SW * .9); L.alpTop = right.reduce((m, t) => (t[1] < m[1] ? t : m), right[0]); }
     const R = seeded(seed * 3), crowns = [];
-    const free = (x) => !(i === 3 && Math.abs(x - HOUSE) < 34) && !(i === 4 && x > LAKE[0] - 10 && x < LAKE[1] + 10);
+    const free = (x) => !(i === 3 && Math.abs(x - HOUSE) < 34) && !((i === 4 || i === 5) && x > LAKE[0] - 30 && x < LAKE[1] + 30);
     if (pines) { // Weißtannen (gestuft, schmal) + Laubbäume dazwischen
       for (let j = 0; j < pts.length; j++) {
         const [x, y] = pts[j]; if (!free(x)) continue;
@@ -261,7 +265,7 @@ function buildClouds() {
 // Nebelbänke zwischen Schichten (für alle Landschaften)
 function fogBand(base, R) { const fg = mk("g", { filter: "url(#sc-blur8)" }); for (let j = 0; j < Math.ceil(SW / 190); j++) mk("ellipse", { cx: 80 + j * 190 + R() * 60, cy: base + 8, rx: 90 + R() * 70, ry: 7 + R() * 4, class: "fogc" }, fg); }
 const layer = (d) => { const g = mk("g", {}), p = mk("path", { d }, g); layerEls.push(p); return p; };
-const ridgeD = (pts) => `M-10 210 L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} 210Z`;
+const ridgeD = (pts) => `M-10 ${SH} L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} ${SH}Z`;
 
 // ---------- Küste: Landzungen, Meer mit Glitzern, Leuchtturm auf der Klippe ----------
 function buildCoast() {
@@ -269,7 +273,7 @@ function buildCoast() {
   layer(ridgeD(ridgePts(11, HZ - 14, 14, .8, false).map(([x, y]) => [x, x > SW * .58 ? y : HZ + 2 + (y - HZ) * .2]))); fogBand(HZ - 14, R);
   layer(ridgeD(ridgePts(23, HZ - 4, 9, 1, false).map(([x, y]) => [x, x < SW * .28 ? y : HZ + 2]))); fogBand(HZ - 6, R);
   // Meer (spiegelt den Himmel)
-  mk("rect", { x: 0, y: HZ, width: SW, height: 210 - HZ, fill: "url(#sc-lake)" });
+  mk("rect", { x: 0, y: HZ, width: SW, height: SH - HZ, fill: "url(#sc-lake)" });
   L.shimmer = mk("g", {}, mv);
   for (let j = 0; j < SW / 10; j++) { const y = HZ + 3 + Math.pow(R(), 1.4) * 70, x = R() * SW, w = 5 + (y - HZ) * .5 * R() + 3; mk("path", { d: `M${x} ${y} h${w}`, stroke: "#fff", "stroke-width": .4 + (y - HZ) / 70, "stroke-linecap": "round", class: "shim", style: `animation-delay:${R() * 3}s` }, L.shimmer); }
   // Klippe rechts mit Leuchtturm
@@ -346,7 +350,7 @@ function draw(m) {
   // Luftperspektive: hinten fast Horizontfarbe, vorne dunkel; tagsüber mit Jahreszeit-Ton
   const deep = mix(mix(top, "#05070F", .55), "#05070F", night * .5);
   layerEls.forEach((el, i) => {
-    const k = .22 + i * .19;
+    const k = Math.min(1, .22 + i * (layerEls.length > 5 ? .13 : .19));
     let c = mix(hor, deep, k);
     c = mix(c, se.tint, se.k * 1.8 * d * (.3 + i / 5.5));
     if (TH === "alpen") { if (i <= 1) c = mix(c, "#5E636E", .35 * (.4 + .6 * d)); else if (i === 2) c = mix(c, "#5F8F45", .32 * d); }
@@ -612,7 +616,7 @@ let lastEv = 0;
 const fire = (name) => { lastEv = Date.now(); EV[name](); };
 function nextEvent() { clearTimeout(evT); evT = setTimeout(() => { if (on && !quiet()) { lastEv = Date.now(); randomEvent(); } nextEvent(); }, (180 + Math.random() * 180) * 1000); }
 window.addEventListener("focus", () => { if (on && !quiet() && Date.now() - lastEv > 300000) setTimeout(() => { lastEv = Date.now(); randomEvent(); }, 1500); });
-function measure() { const w = box.clientWidth, h = box.clientHeight; return w && h ? Math.max(700, Math.min(2600, Math.round(210 * w / h))) : SW; }
+function measure() { const w = box.clientWidth, h = box.clientHeight; return w && h ? Math.max(700, Math.min(2600, Math.round(SH * w / h))) : SW; }
 let seasonTest = null, playing = 0;
 function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || theme() !== TH || Math.abs(nw - SW) > 30) { season = s; SW = nw; build(); built = true; } else if (wKey() !== wxKey) buildClouds(); draw(minuteNow()); }
 let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); }, 250); }).observe(box); } catch {}

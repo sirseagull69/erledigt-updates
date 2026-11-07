@@ -151,7 +151,7 @@ function render() {
   const cnt = (id) => items.filter((t) => !t.done && !t.archived && (id === "alle" ? MODE_LISTS[mode].includes(t.list) : t.list === id)).length;
   $("chips").innerHTML = [{ id: "alle", name: "Alle", dot: "var(--fg)" }, ...shownLists()].map((l) => `<button type="button" class="chip" data-list="${l.id}" aria-pressed="${list === l.id}" style="--c:${l.dot}">${l.id === "alle" ? "" : "<i></i>"}${l.name}<b>${cnt(l.id) || ""}</b></button>`).join("");
   $("view-list").hidden = tab !== "list"; $("view-cal").hidden = tab !== "cal";
-  if (tab === "list") renderList(); else renderCal();
+  if (tab === "list") renderList(); else { document.body.classList.remove("alles-frei"); renderCal(); }
   $("cal-btn").setAttribute("aria-pressed", String(tab === "cal"));
   const sd = parseIso(calSel);
   $("add-in").placeholder = tab === "cal" ? `Was ist am ${sd.getDate()}.${sd.getMonth() + 1}.?` : "Was steht an?";
@@ -161,7 +161,10 @@ function renderList() {
   const doneToday = all.filter((t) => t.done && t.doneAt && iso(new Date(t.doneAt)) === today);
   let html = "";
   SECTIONS.forEach((name, i) => { const sec = open.filter((t) => sectionOf(t) === i); if (sec.length) html += `<div class="sec${i === 0 ? " late" : ""}">${name} <span>${sec.length}</span></div>` + sec.map(taskHtml).join(""); });
-  if (!open.length) html = `<div class="empty"><b>${doneToday.length ? "Alles erledigt 🎉" : "Nichts zu tun"}</b>Unten eintippen, Enter – fertig.</div>`;
+  const frei = !open.length && doneToday.length > 0; // nach getaner Arbeit: Landschaft wächst (wie am PC)
+  document.body.classList.toggle("alles-frei", frei);
+  if (frei) html = `<div class="frei"><b>Alles erledigt.</b><span>Heute ${doneToday.length} ${doneToday.length === 1 ? "Aufgabe" : "Aufgaben"} geschafft.</span></div>`;
+  else if (!open.length) html = `<div class="empty"><b>Nichts zu tun</b>Unten eintippen, Enter – fertig.</div>`;
   if (doneToday.length) html += `<details class="done-box"${store.get("em-done-open", false) ? " open" : ""}><summary class="sec">Heute erledigt <span>${doneToday.length}</span></summary>${doneToday.map(taskHtml).join("")}</details>`;
   $("view-list").innerHTML = html;
 }

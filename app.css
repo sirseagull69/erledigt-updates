@@ -287,8 +287,17 @@ body.resizing *, body.resizing *::before, body.resizing *::after { transition: n
 #app { padding: 0 18px calc(150px + var(--safe-b)); }
 
 /* Kopf: Landschaft randlos oben, läuft weich in den Hintergrund aus */
-body.has-scene .top { margin: 0 -18px 6px; border-radius: 0; min-height: calc(176px + var(--safe-t)); padding: calc(14px + var(--safe-t)) 18px 34px; }
-body.has-scene .sc { border-radius: 0; box-shadow: none; -webkit-mask-image: linear-gradient(#000 62%, transparent); mask-image: linear-gradient(#000 62%, transparent); }
+body.has-scene .top { margin: 0 -18px 6px; border-radius: 0; min-height: calc(var(--sc-h, 236px) + var(--safe-t)); padding: calc(14px + var(--safe-t)) 18px 34px; }
+/* Alles erledigt: Landschaft wächst und übernimmt den leeren Platz */
+body.has-scene .top { transition: min-height .7s cubic-bezier(.2, .8, .2, 1); }
+body.has-scene.alles-frei .top { min-height: calc(min(62vh, 520px) + var(--safe-t)); }
+.frei { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 24px 20px 8px; }
+.frei b { font: 800 30px/1.1 var(--display, var(--font)); }
+.frei span { color: var(--muted); font-size: 15px; }
+@media (prefers-reduced-motion: reduce) { body.has-scene .top { transition: none; } }
+/* Hohe Landschaft mit Vordergrund (mobil 3.13); Schleier hinter Gruß und Titel für Kontrast bei hellem Himmel */
+body.has-scene .top::before { content: ""; position: absolute; z-index: -1; left: 0; top: 0; width: 78%; height: 150px; background: radial-gradient(ellipse 70% 60% at 0 0, rgb(12 12 28 / .45), transparent 72%); pointer-events: none; }
+body.has-scene .sc { border-radius: 0; box-shadow: none; -webkit-mask-image: linear-gradient(#000 84%, transparent); mask-image: linear-gradient(#000 84%, transparent); }
 .top { padding-top: calc(14px + var(--safe-t)); }
 .top h1 { font-size: 34px; }
 .icon-btn { width: 38px; height: 38px; border-radius: 50%; box-shadow: none; background: transparent; }
@@ -360,7 +369,7 @@ body.has-scene .icon-btn { background: rgb(10 14 30 / .22); }
 .c-tools .dot { width: 10px; height: 10px; }
 
 /* Tablet/iPad: Landschaft über die ganze Breite und höher, Inhalt etwas breiter */
-body.has-scene .top { margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); padding-left: max(18px, calc(50vw - 392px)); padding-right: max(18px, calc(50vw - 392px)); min-height: calc(clamp(176px, 34vw, 340px) + var(--safe-t)); }
+body.has-scene .top { margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); padding-left: max(18px, calc(50vw - 392px)); padding-right: max(18px, calc(50vw - 392px)); min-height: calc(clamp(var(--sc-h, 236px), 40vw, 420px) + var(--safe-t)); }
 @media (min-width: 700px) {
   #app { max-width: 820px; }
   .top h1 { font-size: 44px; }
