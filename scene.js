@@ -467,25 +467,31 @@ function randomEvent() { const nat = TH === "wald" || TH === "alpen"; const pool
 
 
 // ---------- Wetter (Open-Meteo, kein Konto, nur fester Ort Nufringen) ----------
-function applyWeather(code, cover) {
-  const c = +code || 0;
+// Stärke nach der echten Niederschlagsmenge (mm der letzten 15 Min), nicht nur nach dem Wettercode:
+// der meldet oft „Regen“ oder „Gewitter“, obwohl draußen kaum was fällt. Ohne Menge (alter Cache, Testmodus) zählt der Code.
+function applyWeather(code, cover, mm) {
+  const c = +code || 0, has = typeof mm === "number" && isFinite(mm);
   W.cover = Math.max(0, Math.min(1, (+cover || 0) / 100));
-  W.rain = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(c) ? ([55, 57, 65, 67, 82, 95, 96, 99].includes(c) ? 1 : [53, 63, 81].includes(c) ? .6 : .3) : 0;
-  W.snow = [71, 73, 75, 77, 85, 86].includes(c) ? ([75, 86].includes(c) ? 1 : .55) : 0;
+  const wet = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99].includes(c), drizzle = c >= 51 && c <= 57;
+  const byCode = [55, 57, 65, 67, 82, 95, 96, 99].includes(c) ? 1 : [53, 63, 81].includes(c) ? .6 : .3;
+  const byMm = mm <= 0 ? .08 : mm < .1 ? .15 : mm < .3 ? .3 : mm < .8 ? .55 : 1;
+  W.rain = wet ? (has ? Math.min(byMm, drizzle ? .2 : 1) : byCode) : 0;
+  const snowy = [71, 73, 75, 77, 85, 86].includes(c);
+  W.snow = snowy ? (has ? (mm <= 0 ? .2 : mm < .3 ? .45 : 1) : [75, 86].includes(c) ? 1 : .55) : 0;
   W.fog = [45, 48].includes(c) ? 1 : 0;
-  W.storm = c >= 95;
+  W.storm = c >= 95 && (!has || mm >= .3); // Blitze nur, wenn es auch richtig regnet
 }
 async function loadWeather(force) {
   const test = store.get("erledigt-wetter-test", ""); // zum Ausprobieren: "regen", "schnee", "gewitter", "nebel", "wolken"
   if (test) { applyWeather({ sonne: 0, regen: 63, schnee: 73, gewitter: 95, nebel: 45, wolken: 3 }[test] || 0, { sonne: 0, wolken: 90 }[test] ?? 70); return; }
   const pl = placeNow(), key = pl.lat.toFixed(2) + "," + pl.lon.toFixed(2), day = iso(todayD());
   const cache = store.get("erledigt-wetter", null), fresh = cache && cache.key === key && cache.day === day;
-  const useCache = (c) => { applyWeather(c.code, c.cover); W.sunrise = c.sr || 0; W.sunset = c.ss || 0; };
+  const useCache = (c) => { applyWeather(c.code, c.cover, c.mm); W.sunrise = c.sr || 0; W.sunset = c.ss || 0; };
   if (fresh && !force && Date.now() - cache.t < 30 * 60e3) { useCache(cache); return; }
   try {
-    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pl.lat}&longitude=${pl.lon}&current=weather_code,cloud_cover&daily=sunrise,sunset&forecast_days=1&timezone=auto`);
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pl.lat}&longitude=${pl.lon}&current=weather_code,cloud_cover,precipitation&daily=sunrise,sunset&forecast_days=1&timezone=auto`);
     const j = await r.json(), cur = j.current || {}, toMin = (t) => { const m = String(t || "").match(/T(\d\d):(\d\d)/); return m ? +m[1] * 60 + +m[2] : 0; };
-    const c = { t: Date.now(), key, day, code: cur.weather_code, cover: cur.cloud_cover, sr: toMin(j.daily?.sunrise?.[0]), ss: toMin(j.daily?.sunset?.[0]) };
+    const c = { t: Date.now(), key, day, code: cur.weather_code, cover: cur.cloud_cover, mm: cur.precipitation, sr: toMin(j.daily?.sunrise?.[0]), ss: toMin(j.daily?.sunset?.[0]) };
     store.set("erledigt-wetter", c); useCache(c);
   } catch { if (cache) useCache(cache); }
 }
