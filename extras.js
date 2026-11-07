@@ -114,7 +114,7 @@ $("set").addEventListener("click", (e) => {
   if (e.target.id === "ex-find") { placeFind(); return; }
   if (e.target.id === "ex-upd") { forceUpdate(e.target); return; }
   const pl = e.target.closest("[data-place]");
-  if (pl) { design.place = JSON.parse(pl.dataset.place); $("ex-cur").textContent = design.place.name; $("ex-hits").innerHTML = ""; $("ex-ort").value = ""; saveDesign(); window.__scene?.reloadWeather?.(); }
+  if (pl) { design.place = JSON.parse(pl.dataset.place); $("ex-cur").textContent = design.place.name; $("ex-hits").innerHTML = ""; $("ex-ort").value = ""; saveDesign(); window.__scene?.reloadWeather?.(); loadWeek(true); }
 });
 $("set").addEventListener("change", (e) => {
   const id = e.target.id;
@@ -220,3 +220,51 @@ toggleDone = function (id) {
   if (before > 0 && openNow() === 0) burst(cx, cy, 60, 4); // alles erledigt: großes Konfetti mit Regen
   else burst(cx, cy, 18, 1.3);
 };
+
+
+// ---------- Wetter (wie am PC): heute im Kopf, 7 Tage beim Antippen, Symbole im Kalender ----------
+const WX = {
+  sun: '<svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="4.5" fill="#F5B83D"/><g stroke="#F5B83D" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></svg>',
+  part: '<svg viewBox="0 0 24 24" width="22" height="22"><circle cx="9" cy="9" r="3.6" fill="#F5B83D"/><g stroke="#F5B83D" stroke-width="1.8" stroke-linecap="round"><path d="M9 2.5v1.4M2.5 9h1.4M4.4 4.4l1 1M13.6 4.4l-1 1"/></g><path d="M8 19.5h9a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.5 1.3A2.9 2.9 0 0 0 8 19.5z" fill="#C9D3E0"/></svg>',
+  cloud: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 19h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 19z" fill="#AEB8C6"/></svg>',
+  fog: '<svg viewBox="0 0 24 24" width="22" height="22"><g stroke="#AEB8C6" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M6 13h12M4 17h16"/></g></svg>',
+  rain: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 15h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 15z" fill="#AEB8C6"/><g stroke="#5AA2E8" stroke-width="2" stroke-linecap="round"><path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5"/></g></svg>',
+  snow: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 14.5h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 14.5z" fill="#AEB8C6"/><g fill="#DDEBFA"><circle cx="8.5" cy="18" r="1.3"/><circle cx="12.5" cy="20" r="1.3"/><circle cx="16.5" cy="18" r="1.3"/></g></svg>',
+  storm: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 14.5h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 14.5z" fill="#8E99A8"/><path d="M12.5 14l-2.5 4h2.5l-1.5 4 4-5.5h-2.6l1.6-2.5z" fill="#F5B83D"/></svg>',
+};
+const wxKind = (c) => c === 0 ? "sun" : c <= 2 ? "part" : c === 3 ? "cloud" : c === 45 || c === 48 ? "fog" : c >= 95 ? "storm" : (c >= 71 && c <= 77) || c === 85 || c === 86 ? "snow" : (c >= 51 && c <= 67) || (c >= 80 && c <= 82) ? "rain" : "cloud";
+const WX_NAME = { sun: "Sonnig", part: "Leicht bewölkt", cloud: "Bewölkt", fog: "Nebel", rain: "Regen", snow: "Schnee", storm: "Gewitter" };
+let week = store.get("em-woche", null);
+async function loadWeek(force) {
+  const pl = (design.place && isFinite(design.place.lat)) ? design.place : { name: "Nufringen", lat: 48.62, lon: 8.89 };
+  const key = pl.lat.toFixed(2) + "," + pl.lon.toFixed(2);
+  if (week && week.key === key && Date.now() - week.t < 3600e3 && !force) return;
+  try {
+    const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pl.lat}&longitude=${pl.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&timezone=auto`)).json(), d = j.daily;
+    week = { key, name: pl.name, t: Date.now(), days: d.time.map((t, i) => ({ t, c: d.weather_code[i], hi: Math.round(d.temperature_2m_max[i]), lo: Math.round(d.temperature_2m_min[i]), p: d.precipitation_probability_max?.[i] ?? null })) };
+    store.set("em-woche", week); render();
+  } catch {}
+}
+const dayWx = (k) => week?.days.find((d) => d.t === k);
+function wxRows() {
+  const today = iso(todayD()), lo = Math.min(...week.days.map((d) => d.lo)), hi = Math.max(...week.days.map((d) => d.hi)), span = Math.max(1, hi - lo);
+  return week.days.map((d) => { const dt = new Date(d.t + "T12:00"), k = wxKind(d.c);
+    return `<div class="wx-row"><span class="wx-d">${d.t === today ? "Heute" : WD[dt.getDay()].slice(0, 2)}</span><span class="wx-i">${WX[k]}</span><span class="wx-p">${d.p != null && d.p >= 30 ? d.p + " %" : ""}</span><span class="wx-lo">${d.lo}°</span><span class="wx-bar"><i style="left:${(d.lo - lo) / span * 100}%;right:${(hi - d.hi) / span * 100}%"></i></span><span class="wx-hi">${d.hi}°</span></div>`; }).join("");
+}
+function wxHead() {
+  let el = $("wx-now");
+  if (!el) { el = document.createElement("button"); el.type = "button"; el.id = "wx-now"; el.className = "wx-now"; document.querySelector(".top-txt").appendChild(el); }
+  const d = dayWx(iso(todayD()));
+  el.hidden = !d; if (!d) return;
+  el.innerHTML = WX[wxKind(d.c)] + `${d.hi}°<small>${d.lo}°</small>`;
+}
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#wx-now") || !week) return;
+  $("wx-sheet").innerHTML = `<div class="wx-h"><b>Wetter</b><span>${esc(week.name || "")}</span></div>${wxRows()}`;
+  $("wx-wrap").hidden = false;
+});
+const renderCal0 = renderCal;
+renderCal = function () { renderCal0(); document.querySelectorAll("#view-cal .day[data-day]").forEach((b) => { const d = dayWx(b.dataset.day); if (d) b.insertAdjacentHTML("beforeend", `<span class="day-wx">${WX[wxKind(d.c)]}</span>`); }); };
+const render2 = render;
+render = function () { render2(); if (loaded) wxHead(); };
+loadWeek(); setInterval(() => loadWeek(), 30 * 60e3);
