@@ -273,7 +273,8 @@ function renderDet() {
     <div class="row2"><label class="field"><span>Uhrzeit</span><input type="time" id="d-time" value="${t.time || ""}"></label><label class="field"><span>Bis</span><input type="time" id="d-tend" value="${t.timeEnd || ""}"></label></div>
     <div class="field"><span>Liste</span><div class="seg">${LISTS.filter((l) => MODE_LISTS[mode].includes(l.id) || l.id === t.list).map((l) => `<button type="button" data-dl="${l.id}" aria-pressed="${t.list === l.id}" style="--c:${l.dot}"><i></i>${l.name}</button>`).join("")}</div></div>
     <div class="field"><span>Priorität</span><div class="seg">${[["hoch", "Hoch"], ["mittel", "Mittel"], ["niedrig", "Niedrig"]].map(([k, l]) => `<button type="button" data-dp="${k}" aria-pressed="${t.prio === k}">${l}</button>`).join("")}</div></div>
-    ${t.checklist.length ? `<div class="field"><span>Unterpunkte</span><div class="cl">${t.checklist.map((c, i) => `<label><input type="checkbox" data-cl="${i}" ${c.done ? "checked" : ""}>${esc(c.text)}</label>`).join("")}</div></div>` : ""}
+    <div class="field"><span>Unterpunkte${t.checklist.length ? ` <small class="muted">${t.checklist.filter((c) => c.done).length}/${t.checklist.length}</small>` : ""}</span><div class="cl">${t.checklist.map((c, i) => `<div class="cl-row${c.done ? " on" : ""}"><label><input type="checkbox" data-cl="${i}" ${c.done ? "checked" : ""}><span>${esc(c.text)}</span></label><button type="button" class="cl-x" data-clx="${i}" aria-label="Unterpunkt löschen">×</button></div>`).join("")}
+      <div class="cl-add"><input id="cl-new" placeholder="Unterpunkt hinzufügen" enterkeyhint="done" autocomplete="off" maxlength="300"></div></div></div>
     <label class="field"><span>Notizen</span><textarea id="d-notes" rows="4" placeholder="Notizen …">${esc(t.notes)}</textarea></label>
     <div class="acts"><button type="button" class="btn danger" id="d-del">Löschen</button><button type="button" class="btn primary" id="d-done">${t.done ? "Wieder öffnen" : "Erledigt"}</button></div>`;
 }
@@ -290,9 +291,18 @@ function saveDetFields() {
 }
 $("det").addEventListener("change", (e) => { if (e.target.matches("input[type=date], input[type=time]")) { saveDetFields(); renderDet(); } if (e.target.dataset.cl !== undefined) { const t = items.find((x) => x.id === detId); const cl = t.checklist.map((c, i) => (i === +e.target.dataset.cl ? { ...c, done: e.target.checked } : c)); patch(t.id, { checklist: cl }); } });
 $("det").addEventListener("focusout", (e) => { if (e.target.id === "d-title" || e.target.id === "d-notes") saveDetFields(); });
+const clId = () => "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+$("det").addEventListener("keydown", (e) => {
+  if (e.target.id !== "cl-new" || e.key !== "Enter") return;
+  e.preventDefault(); const v = e.target.value.trim(); if (!v) return;
+  const t = items.find((x) => x.id === detId); if (!t) return;
+  patch(t.id, { checklist: [...(t.checklist || []), { id: clId(), text: v, done: false }] });
+  renderDet(); setTimeout(() => $("cl-new")?.focus(), 30);
+});
 $("det").addEventListener("click", (e) => {
   const t = items.find((x) => x.id === detId); if (!t) return;
-  const dl = e.target.closest("[data-dl]"), dp = e.target.closest("[data-dp]");
+  const dl = e.target.closest("[data-dl]"), dp = e.target.closest("[data-dp]"), cx = e.target.closest("[data-clx]");
+  if (cx) { patch(t.id, { checklist: t.checklist.filter((_, i) => i !== +cx.dataset.clx) }); renderDet(); return; }
   if (dl) { patch(t.id, { list: dl.dataset.dl }); renderDet(); }
   if (dp) { patch(t.id, { prio: dp.dataset.dp }); renderDet(); }
   if (e.target.id === "d-del") { closeSheet($("det-wrap")); removeItem(t.id); }
