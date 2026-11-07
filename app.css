@@ -211,3 +211,42 @@ input.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 2
 input.sw:checked { background: var(--accent); }
 input.sw:checked::after { transform: translateX(18px); }
 .set-place .btn { padding: 8px 14px; font-size: 15px; }
+
+/* ---------- Sheets: weich rein und raus, nichts wackelt dahinter ---------- */
+body.locked { overflow: hidden; }
+.sheet-wrap { background: rgb(8 6 14 / .45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: fade .22s ease; padding-bottom: var(--kb, 0px); transition: padding-bottom .2s ease; }
+.sheet { overscroll-behavior: contain; animation: up .34s cubic-bezier(.22, 1, .36, 1); transition: transform .25s cubic-bezier(.22, 1, .36, 1); will-change: transform; }
+.sheet-wrap.closing { animation: fadeout .19s ease forwards; }
+.sheet-wrap.closing .sheet { animation: down .19s cubic-bezier(.4, 0, 1, 1) forwards; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes fadeout { to { opacity: 0; } }
+@keyframes down { to { transform: translateY(100%); } }
+.grab { position: relative; }
+.grab::before { content: ""; position: absolute; inset: -14px -60px; }
+
+/* ---------- Eintragen wie am PC ---------- */
+.add-sheet { gap: 14px; padding-top: 16px; }
+.add { background: var(--card); border: 1.5px solid var(--line); border-radius: 18px; padding: 6px 4px 8px; display: flex; flex-direction: column; gap: 2px; transition: border-color .15s; }
+.add:focus-within { border-color: var(--accent); }
+#add-in { border: 0; background: transparent; outline: 0; color: var(--fg); font: 500 18px var(--font); padding: 10px 12px; min-height: 48px; width: 100%; resize: none; }
+#add-in::placeholder { color: var(--faint); font-weight: 400; }
+.add .hint { font-size: 13px; color: var(--faint); padding: 0 12px 2px; display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; height: 26px; gap: 6px; align-items: center; min-height: 24px; }
+.add .hint.hit { color: var(--muted); }
+.add .hint code { font: 600 12px var(--font); background: var(--chip); color: var(--muted); padding: 3px 9px; border-radius: 99px; }
+.add .hint.hit code { background: color-mix(in srgb, var(--accent) 16%, var(--card)); color: var(--accent); }
+.prios { display: flex; gap: 8px; }
+.prios button, .quick button { display: inline-flex; align-items: center; gap: 7px; flex: none; min-height: 40px; padding: 0 13px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: var(--fg); font: 600 14px var(--font); transition: transform .12s ease, border-color .15s, background .15s; }
+.prios button { flex: 1; justify-content: center; }
+.prios button[aria-pressed="true"], .quick button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--card)); color: var(--fg); }
+.prios button:active, .quick button:active, .go:active, .add-acts .btn:active { transform: scale(.95); }
+.dot { width: 8px; height: 8px; border-radius: 99px; flex: none; }
+.quick { display: flex; gap: 8px; align-items: center; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.quick::-webkit-scrollbar { display: none; }
+.q-sep { width: 1px; height: 22px; background: var(--line); flex: none; margin: 0 2px; }
+.add-acts { display: flex; gap: 10px; }
+.add-acts .btn.ghost { flex: 0 0 auto; background: transparent; color: var(--muted); font-size: 16px; padding: 0 16px; min-height: 50px; }
+.go { flex: 1; min-height: 50px; border: 0; border-radius: 14px; background: var(--accent); color: var(--on-party, #fff); font: 700 16px var(--font); display: flex; align-items: center; justify-content: center; gap: 8px; transition: transform .12s ease, opacity .15s; }
+.go:disabled { opacity: .45; }
+/* Neue Aufgabe gleitet rein */
+.task-wrap.fresh { animation: fresh .45s cubic-bezier(.22, 1, .36, 1); }
+@keyframes fresh { from { opacity: 0; transform: translateY(-10px) scale(.97); } }

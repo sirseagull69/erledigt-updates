@@ -200,38 +200,54 @@ function addParsed() {
   if (draft.forDay && !p.due) p.due = draft.forDay;
   return { ...p, title: p.title || txt, list: draft.list || p.list || (draft.forDay && mode === "privat" ? "termine" : defList()), prio: draft.prio || p.prio || "mittel" };
 }
+const PRIO_UI = [["hoch", "Hoch", "var(--danger)"], ["mittel", "Mittel", "#E8A33D"], ["niedrig", "Niedrig", "var(--faint)"]];
 function addPreview() {
   const p = addParsed();
-  const bits = p ? [p.due ? "📅 " + dueText({ due: p.due, until: p.until, time: p.time, timeEnd: p.timeEnd }) : (draft.forDay ? "" : ""), p.repeat ? "↻ wiederholt" : "", p.prio === "hoch" ? "❗ hoch" : ""].filter(Boolean) : [];
-  $("add-prev").innerHTML = bits.map((b) => `<span>${esc(b)}</span>`).join("");
-  const curList = p?.list || defList();
-  $("add-quick").innerHTML = [["heute", "Heute"], ["morgen", "Morgen"], ["prio", "❗ Hoch"]].map(([k, l]) => `<button type="button" data-q="${k}" aria-pressed="${k === "prio" ? draft.prio === "hoch" : false}">${l}</button>`).join("")
-    + shownLists().map((l) => `<button type="button" data-ql="${l.id}" aria-pressed="${curList === l.id}">${l.name}</button>`).join("");
+  const bits = p ? [p.due ? dueText({ due: p.due, until: p.until, time: p.time, timeEnd: p.timeEnd }) : "", p.repeat ? "wiederholt sich" : "", p.list && !draft.list && p.list !== defList() ? listById[p.list]?.name : ""].filter(Boolean) : [];
+  $("add-prev").innerHTML = bits.length ? "Erkannt: " + bits.map((b) => `<code>${esc(b)}</code>`).join("") : `z. B. <code>morgen</code> <code>Fr 14 Uhr</code> <code>9-17 Uhr</code>`;
+  $("add-prev").classList.toggle("hit", bits.length > 0);
+  const curList = p?.list || draft.list || defList(), curPrio = draft.prio || p?.prio || "mittel";
+  $("add-prio").innerHTML = PRIO_UI.map(([k, n, c]) => `<button type="button" data-ap="${k}" aria-pressed="${curPrio === k}"><i class="dot" style="background:${c}"></i>${n}</button>`).join("");
+  const dueK = p?.due || "", t0 = iso(todayD()), t1 = iso(addDays(todayD(), 1));
+  $("add-quick").innerHTML = [["heute", "Heute", t0], ["morgen", "Morgen", t1]].map(([k, l, d]) => `<button type="button" data-q="${k}" aria-pressed="${dueK === d}">${l}</button>`).join("") + '<span class="q-sep"></span>'
+    + shownLists().map((l) => `<button type="button" data-ql="${l.id}" aria-pressed="${curList === l.id}"><i class="dot" style="background:${l.dot}"></i>${l.name}</button>`).join("");
+  $("add-save").disabled = !p;
 }
 function saveAdd() {
-  const p = addParsed(); if (!p) { $("add-wrap").hidden = true; return; }
-  addItem(p); $("add-wrap").hidden = true;
+  const p = addParsed(); if (!p) { closeSheet($("add-wrap")); return; }
+  addItem(p); closeSheet($("add-wrap"));
   if (p.due && tab === "cal") calSel = p.due;
 }
 $("add-btn").addEventListener("click", () => openAdd(tab === "cal" ? calSel : null));
 $("add-in").addEventListener("input", addPreview);
 $("add-in").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveAdd(); } });
 $("add-save").addEventListener("click", saveAdd);
+$("add-cancel").addEventListener("click", () => closeSheet($("add-wrap")));
+$("add-prio").addEventListener("click", (e) => { const b = e.target.closest("[data-ap]"); if (!b) return; draft.prio = b.dataset.ap; addPreview(); $("add-in").focus(); });
 $("add-quick").addEventListener("click", (e) => {
   const q = e.target.closest("[data-q]"), ql = e.target.closest("[data-ql]");
   if (q) {
-    const v = $("add-in").value.replace(/\s+\b(heute|morgen)\b/gi, "");
-    if (q.dataset.q === "prio") draft.prio = draft.prio === "hoch" ? null : "hoch"; else $("add-in").value = (v + " " + q.dataset.q).trim();
+    const had = new RegExp("\\b" + q.dataset.q + "\\b", "i").test($("add-in").value);
+    const v = $("add-in").value.replace(/\s*\b(heute|morgen)\b/gi, "").trim();
+    $("add-in").value = had ? v : (v + " " + q.dataset.q).trim();
   }
   if (ql) draft.list = ql.dataset.ql;
   addPreview(); $("add-in").focus();
 });
 
+// Sheets schließen mit Animation
+function closeSheet(w) {
+  if (!w || w.hidden || w.classList.contains("closing")) return;
+  document.activeElement?.blur?.();
+  w.classList.add("closing");
+  setTimeout(() => { w.hidden = true; w.classList.remove("closing"); }, 190);
+}
+
 // ---------- Details ----------
 let detId = null;
 function openDet(id) { detId = id; renderDet(); $("det-wrap").hidden = false; }
 function renderDet() {
-  const t = items.find((x) => x.id === detId); if (!t) { $("det-wrap").hidden = true; return; }
+  const t = items.find((x) => x.id === detId); if (!t) { closeSheet($("det-wrap")); return; }
   $("det").innerHTML = `
     <textarea class="det-title" id="d-title" rows="2">${esc(t.title)}</textarea>
     <div class="row2"><label class="field"><span>Datum</span><input type="date" id="d-due" value="${t.due || ""}"></label><label class="field"><span>Bis (mehrtägig)</span><input type="date" id="d-until" value="${t.until || ""}" ${t.due ? `min="${t.due}"` : "disabled"}></label></div>
@@ -260,8 +276,8 @@ $("det").addEventListener("click", (e) => {
   const dl = e.target.closest("[data-dl]"), dp = e.target.closest("[data-dp]");
   if (dl) { patch(t.id, { list: dl.dataset.dl }); renderDet(); }
   if (dp) { patch(t.id, { prio: dp.dataset.dp }); renderDet(); }
-  if (e.target.id === "d-del") { $("det-wrap").hidden = true; removeItem(t.id); }
-  if (e.target.id === "d-done") { saveDetFields(); toggleDone(t.id); $("det-wrap").hidden = true; }
+  if (e.target.id === "d-del") { closeSheet($("det-wrap")); removeItem(t.id); }
+  if (e.target.id === "d-done") { saveDetFields(); toggleDone(t.id); closeSheet($("det-wrap")); }
 });
 
 // ---------- Einstellungen ----------
@@ -274,15 +290,15 @@ function openSet() {
   $("set-wrap").hidden = false;
 }
 $("settings-btn").addEventListener("click", () => openSet());
-$("set").addEventListener("click", async (e) => { if (e.target.id === "logout") { await sb.auth.signOut(); $("set-wrap").hidden = true; } });
+$("set").addEventListener("click", async (e) => { if (e.target.id === "logout") { await sb.auth.signOut(); closeSheet($("set-wrap")); } });
 
 // Sheets schließen: Hintergrund tippen oder nach unten wischen
 document.querySelectorAll(".sheet-wrap").forEach((w) => {
-  w.addEventListener("click", (e) => { if (e.target === w) { if (w.id === "det-wrap") saveDetFields(); w.hidden = true; } });
+  w.addEventListener("click", (e) => { if (e.target === w) { if (w.id === "det-wrap") saveDetFields(); closeSheet(w); } });
   let y0 = null; const sh = w.querySelector(".sheet");
-  sh.addEventListener("touchstart", (e) => { y0 = sh.scrollTop <= 0 && e.target.closest(".grab, .sheet") && !e.target.closest("textarea, input") ? e.touches[0].clientY : null; }, { passive: true });
-  sh.addEventListener("touchmove", (e) => { if (y0 === null) return; const dy = e.touches[0].clientY - y0; if (dy > 0) sh.style.transform = `translateY(${dy}px)`; }, { passive: true });
-  sh.addEventListener("touchend", (e) => { if (y0 === null) return; const dy = e.changedTouches[0].clientY - y0; sh.style.transform = ""; y0 = null; if (dy > 110) { if (w.id === "det-wrap") saveDetFields(); w.hidden = true; } });
+  sh.addEventListener("touchstart", (e) => { y0 = e.target.closest(".grab") ? e.touches[0].clientY : null; if (y0 !== null) sh.style.transition = "none"; }, { passive: true });
+  sh.addEventListener("touchmove", (e) => { if (y0 === null) return; const dy = e.touches[0].clientY - y0; sh.style.transform = `translateY(${dy > 0 ? dy : dy / 6}px)`; }, { passive: true });
+  sh.addEventListener("touchend", (e) => { if (y0 === null) return; const dy = e.changedTouches[0].clientY - y0; sh.style.transition = ""; sh.style.transform = ""; y0 = null; if (dy > 110) { if (w.id === "det-wrap") saveDetFields(); closeSheet(w); } });
 });
 
 // ---------- Toast ----------

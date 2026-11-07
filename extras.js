@@ -143,6 +143,20 @@ if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
   navigator.serviceWorker.addEventListener("controllerchange", () => { if (!reloaded) { reloaded = true; location.reload(); } });
 }
 
+// ---------- Sheets: Hintergrund sperren, über der Tastatur bleiben ----------
+const wraps = [...document.querySelectorAll(".sheet-wrap")];
+const lockSync = () => document.body.classList.toggle("locked", wraps.some((w) => !w.hidden));
+new MutationObserver(lockSync).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
+if (window.visualViewport) {
+  const kb = () => { const v = visualViewport, off = Math.max(0, innerHeight - v.height - v.offsetTop); document.documentElement.style.setProperty("--kb", off > 60 ? off + "px" : "0px"); };
+  visualViewport.addEventListener("resize", kb); visualViewport.addEventListener("scroll", kb);
+}
+
+// ---------- Neue Aufgabe kurz hervorheben ----------
+let freshId = null;
+const addItem0 = addItem;
+addItem = function (p) { const id = addItem0(p); freshId = id; requestAnimationFrame(() => { document.querySelector(`.task-wrap[data-id="${id}"]`)?.classList.add("fresh"); freshId = null; }); return id; };
+
 // ---------- Einhängen ----------
 const render0 = render;
 const WD_S = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"], MO_S = ["Jan", "Feb", "März", "Apr", "Mai", "Juni", "Juli", "Aug", "Sep", "Okt", "Nov", "Dez"];
