@@ -1,6 +1,6 @@
 // App-Hülle offline verfügbar machen. Daten kommen immer live von Supabase.
-const V = "erledigt-mobil-2";
-const SHELL = ["./", "index.html", "app.css", "app.js", "shared.js", "vendor/supabase.js", "manifest.webmanifest", "icons/icon-192.png"];
+const V = "erledigt-mobil-3";
+const SHELL = ["./", "index.html", "app.css", "app.js", "shared.js", "vendor/supabase.js", "extras.js", "scene.js", "manifest.webmanifest", "icons/icon-192.png"];
 self.addEventListener("install", (e) => { self.skipWaiting(); e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL))); });
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener("fetch", (e) => {
