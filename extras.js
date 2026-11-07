@@ -8,6 +8,7 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)");
 const DESIGN0 = { preset: "standard", place: null, start: "07:30", end: "16:30", w: { scene: true } };
 var design = Object.assign({}, DESIGN0, store.get("em-design", {}));
 design.w = Object.assign({}, DESIGN0.w, design.w || {});
+if (!design.end) design.end = "16:30";
 const saveDesign = () => store.set("em-design", design);
 
 const privMode = () => mode === "privat";
@@ -79,15 +80,14 @@ function applyDesign() {
 const setOpen0 = openSet;
 openSet = function () {
   setOpen0();
-  const pl = design.place || { name: "Nufringen" }, noJob = !design.end;
+  const pl = design.place || { name: "Nufringen" };
   const sw = Object.entries(PRESETS).map(([k, p]) => `<button type="button" class="swatch" data-preset="${k}" aria-pressed="${design.preset === k}" style="--a:${p.a};--b:${p.ad}"><i></i><span>${p.name}</span></button>`).join("");
   const html = `
     <h3 class="set-h">Hell oder dunkel</h3>
     <div class="modes" id="ex-theme">${[["system", "Wie Handy"], ["light", "Hell"], ["dark", "Dunkel"]].map(([k, n]) => `<button type="button" data-theme-opt="${k}" aria-pressed="${(design.theme || "system") === k}">${n}</button>`).join("")}</div>
     <h3 class="set-h">Farbe</h3><div class="swatches">${sw}</div>
     <h3 class="set-h" id="set-work">Arbeitszeit</h3>
-    <div class="set-row"><span>Von – bis</span><span class="set-time"><input type="time" id="ex-von" value="${esc(arbeitsbeginn())}" ${noJob ? "disabled" : ""}> – <input type="time" id="ex-bis" value="${esc(design.end || "16:30")}" ${noJob ? "disabled" : ""}></span></div>
-    <label class="set-row"><span>Ich arbeite nicht <small class="muted">(kein Countdown)</small></span><input type="checkbox" id="ex-nojob" class="sw" ${noJob ? "checked" : ""}></label>
+    <div class="set-row"><span>Von – bis</span><span class="set-time"><input type="time" id="ex-von" value="${esc(arbeitsbeginn())}"> – <input type="time" id="ex-bis" value="${esc(design.end || "16:30")}"></span></div>
     <h3 class="set-h">Himmel oben</h3>
     <label class="set-row"><span>Landschaft mit Wetter</span><input type="checkbox" id="ex-scene" class="sw" ${design.w.scene ? "checked" : ""}></label>
     <div class="set-row col"><span>Wetter-Ort: <b id="ex-cur">${esc(pl.name)}</b></span><span class="set-place"><input id="ex-ort" placeholder="Stadt suchen …" enterkeyhint="search"><button type="button" class="btn" id="ex-find">Suchen</button></span><span class="set-hits" id="ex-hits"></span></div>
@@ -118,8 +118,7 @@ $("set").addEventListener("click", (e) => {
 });
 $("set").addEventListener("change", (e) => {
   const id = e.target.id;
-  if (id === "ex-nojob") { $("ex-von").disabled = $("ex-bis").disabled = e.target.checked; design.end = e.target.checked ? "" : ($("ex-bis").value || "16:30"); changed(); }
-  else if (id === "ex-von" && /^\d{2}:\d{2}$/.test(e.target.value)) { design.start = e.target.value; changed(); }
+  if (id === "ex-von" && /^\d{2}:\d{2}$/.test(e.target.value)) { design.start = e.target.value; changed(); }
   else if (id === "ex-bis" && /^\d{2}:\d{2}$/.test(e.target.value)) { design.end = e.target.value; changed(); }
   else if (id === "ex-scene") { design.w.scene = e.target.checked; changed(); }
 });

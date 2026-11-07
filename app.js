@@ -285,7 +285,7 @@ function openSet() {
   $("set").innerHTML = `<h2 style="margin:4px 0">Einstellungen</h2>
     <div class="set-row"><span>Angemeldet als</span><b style="overflow:hidden;text-overflow:ellipsis">${esc(session?.user?.email || "")}</b></div>
     ${/ErledigtAndroid/.test(navigator.userAgent) ? "" : `<div class="set-row"><span>Auf den Home-Bildschirm</span><span class="muted" style="text-align:right;font-size:14px">iPhone: Teilen → „Zum Home-Bildschirm“</span></div>`}
-    <div class="set-row"><span>Version</span><span class="muted">mobil 1.6${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
+    <div class="set-row"><span>Version</span><span class="muted">mobil 1.7${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
     <button type="button" class="btn danger wide" id="logout">Abmelden</button>`;
   $("set-wrap").hidden = false;
 }
