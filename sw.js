@@ -1,7 +1,7 @@
 // App-Hülle offline verfügbar machen. Daten kommen immer live von Supabase.
 importScripts("version.js");
 const V = "erledigt-mobil-" + APP_VERSION;
-const SHELL = ["./", "index.html", "version.js", "app.css", "app.js", "shared.js", "vendor/supabase.js", "extras.js", "scene.js", "push.js",
+const SHELL = ["./", "index.html", "version.js", "app.css", "app.js", "shared.js", "vendor/supabase.js", "extras.js", "scene.js", "push.js", "bericht.js",
   "fonts/inter-latin-wght-normal.woff2", "fonts/bricolage-grotesque-latin-700-normal.woff2", "fonts/bricolage-grotesque-latin-800-normal.woff2",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", (e) => { self.skipWaiting(); e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL))); });

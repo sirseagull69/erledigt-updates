@@ -29,7 +29,7 @@ const SB_URL = "https://ovosbxkwqgxxfekrtlov.supabase.co";
 const SB_KEY = "sb_publishable_cvKxZ4tvDpez0OWyf-C-og_raV3cGVZ"; // öffentlicher Schlüssel, Schutz über RLS
 const sb = supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: "erledigt-mobile-auth" } });
 const FIELD = { title: "title", due: "due", until: "due_end", time: "time", timeEnd: "time_end", prio: "prio", list: "list", done: "done", archived: "archived", repeat: "repeat", notes: "notes", checklist: "checklist" };
-const fromRow = (r) => ({ id: r.id, title: r.title, due: r.due, until: r.due_end || null, time: r.time, timeEnd: r.time_end || null, prio: PRIO[r.prio] !== undefined ? r.prio : "mittel", list: listById[r.list] ? r.list : "arbeit", done: !!r.done, archived: !!r.archived, repeat: r.repeat || null, notes: r.notes || "", checklist: Array.isArray(r.checklist) ? r.checklist : [], doneAt: r.done_at ? Date.parse(r.done_at) : null, createdAt: Date.parse(r.created_at) || Date.now() });
+const fromRow = (r) => ({ id: r.id, title: r.title, due: r.due, until: r.due_end || null, time: r.time, timeEnd: r.time_end || null, prio: PRIO[r.prio] !== undefined ? r.prio : "mittel", list: listById[r.list] ? r.list : "arbeit", done: !!r.done, archived: !!r.archived, repeat: r.repeat || null, notes: r.notes || "", checklist: Array.isArray(r.checklist) ? r.checklist : [], solution: r.solution || "", doneAt: r.done_at ? Date.parse(r.done_at) : null, createdAt: Date.parse(r.created_at) || Date.now() });
 function toRow(p) {
   const row = {};
   for (const k in p) {
@@ -163,7 +163,7 @@ function renderList() {
   SECTIONS.forEach((name, i) => { const sec = open.filter((t) => sectionOf(t) === i); if (sec.length) html += `<div class="sec${i === 0 ? " late" : ""}">${name} <span>${sec.length}</span></div>` + sec.map(taskHtml).join(""); });
   const frei = !open.length && doneToday.length > 0; // nach getaner Arbeit: Landschaft wächst (wie am PC)
   document.body.classList.toggle("alles-frei", frei);
-  if (frei) html = `<div class="frei"><b>Alles erledigt.</b><span>Heute ${doneToday.length} ${doneToday.length === 1 ? "Aufgabe" : "Aufgaben"} geschafft.</span></div>`;
+  if (frei) html = `<div class="frei"><b>Alles erledigt.</b><span>Heute ${doneToday.length} ${doneToday.length === 1 ? "Aufgabe" : "Aufgaben"} geschafft.</span><div class="frei-acts"><button type="button" class="chip-btn" data-frei="rep">Was hab ich gemacht?</button><button type="button" class="chip-btn" data-frei="plan">Morgen planen</button></div></div>`;
   else if (!open.length) html = `<div class="empty"><b>Nichts zu tun</b>Unten eintippen, Enter – fertig.</div>`;
   if (doneToday.length) html += `<details class="done-box"${store.get("em-done-open", false) ? " open" : ""}><summary class="sec">Heute erledigt <span>${doneToday.length}</span></summary>${doneToday.map(taskHtml).join("")}</details>`;
   $("view-list").innerHTML = html;

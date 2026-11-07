@@ -301,10 +301,14 @@ body.resizing *, body.resizing *::before, body.resizing *::after { transition: n
 body.has-scene .top { margin: 0 -18px 6px; border-radius: 0; min-height: calc(var(--sc-h, 236px) + var(--safe-t)); padding: calc(14px + var(--safe-t)) 18px 34px; }
 /* Alles erledigt: Landschaft wächst und übernimmt den leeren Platz */
 body.has-scene .top { transition: min-height .7s cubic-bezier(.2, .8, .2, 1); }
-body.has-scene.alles-frei .top { min-height: calc(min(62vh, 520px) + var(--safe-t)); }
+body.has-scene.alles-frei .top { min-height: calc(min(50vh, 520px) + var(--safe-t)); }
 .frei { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 24px 20px 8px; }
 .frei b { font: 800 30px/1.1 var(--display, var(--font)); }
 .frei span { color: var(--muted); font-size: 15px; }
+.frei-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 10px; }
+.chip-btn { border: 0; border-radius: 99px; padding: 10px 16px; background: var(--chip); color: var(--fg); font: 600 14px var(--font); }
+.chip-btn:active { background: color-mix(in srgb, var(--accent) 18%, var(--chip)); }
+.rep-out { width: 100%; box-sizing: border-box; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--fg); padding: 12px; font: 14px/1.5 var(--font); resize: none; }
 @media (prefers-reduced-motion: reduce) { body.has-scene .top { transition: none; } }
 /* Hohe Landschaft mit Vordergrund (mobil 3.13); Schleier hinter Gruß und Titel für Kontrast bei hellem Himmel */
 body.has-scene .top::before { content: ""; position: absolute; z-index: -1; left: 0; top: 0; width: 78%; height: 150px; background: radial-gradient(ellipse 70% 60% at 0 0, rgb(12 12 28 / .45), transparent 72%); pointer-events: none; }

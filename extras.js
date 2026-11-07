@@ -105,6 +105,8 @@ openSet = function () {
     <label class="set-row"><span>Landschaft mit Wetter</span><input type="checkbox" id="ex-scene" class="sw" ${design.w.scene ? "checked" : ""}></label>
     <label class="set-row"><span>Große Landschaft<br><small class="muted">Mit Wiese und Bäumen vorne</small></span><input type="checkbox" id="ex-hoch" class="sw" ${design.w.hoch !== false ? "checked" : ""}></label>
     <div class="set-row col"><span>Wetter-Ort: <b id="ex-cur">${esc(pl.name)}</b></span><span class="set-place"><input id="ex-ort" placeholder="Stadt suchen …" enterkeyhint="search"><button type="button" class="btn" id="ex-find">Suchen</button></span><span class="set-hits" id="ex-hits"></span></div>
+    <h3 class="set-h">Rückblick</h3>
+    <div class="set-row"><span>Was hab ich gemacht?</span><button type="button" class="btn" id="ex-rep" style="padding:8px 14px;font-size:15px">Öffnen</button></div>
     <h3 class="set-h">App</h3>
     <div class="set-row"><span>Neueste Version holen</span><button type="button" class="btn" id="ex-upd" style="padding:8px 14px;font-size:15px">Aktualisieren</button></div>
     <h3 class="set-h">Konto</h3>`;
@@ -130,6 +132,7 @@ $("set").addEventListener("click", (e) => {
   if (sc) { design.scene = sc.dataset.scene; saveDesign(); if (typeof sceneSync === "function") sceneSync(); document.querySelectorAll("[data-scene]").forEach((b) => b.setAttribute("aria-pressed", String(b === sc))); return; }
   if (e.target.id === "ex-find") { placeFind(); return; }
   if (e.target.id === "ex-upd") { forceUpdate(e.target); return; }
+  if (e.target.id === "ex-rep") { closeSheet($("set-wrap")); setTimeout(openRep, 220); return; }
   const pl = e.target.closest("[data-place]");
   if (pl) { design.place = JSON.parse(pl.dataset.place); $("ex-cur").textContent = design.place.name; $("ex-hits").innerHTML = ""; $("ex-ort").value = ""; saveDesign(); window.__scene?.reloadWeather?.(); loadWeek(true); }
 });
