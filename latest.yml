@@ -1,0 +1,8 @@
+version: 2.6.6
+files:
+  - url: https://github.com/sirseagull69/erledigt-updates/releases/download/v2.6.6/Erledigt-Setup-2.6.6.exe
+    sha512: djvn1ZFXPtR+K73wi02w2GP89/E/5iIPPC12V6ZIPXgdIpAE75sEoUA/TOCQPL5nOzkxd/O22OA9TRymBvt7LQ==
+    size: 91806099
+path: https://github.com/sirseagull69/erledigt-updates/releases/download/v2.6.6/Erledigt-Setup-2.6.6.exe
+sha512: djvn1ZFXPtR+K73wi02w2GP89/E/5iIPPC12V6ZIPXgdIpAE75sEoUA/TOCQPL5nOzkxd/O22OA9TRymBvt7LQ==
+releaseDate: '2026-11-07T13:19:36.270Z'
