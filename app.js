@@ -277,7 +277,7 @@ function openSet() {
   $("set").innerHTML = `<h2 style="margin:4px 0">Einstellungen</h2>
     <div class="set-row"><span>Angemeldet als</span><b style="overflow:hidden;text-overflow:ellipsis">${esc(session?.user?.email || "")}</b></div>
     ${/ErledigtAndroid/.test(navigator.userAgent) ? "" : `<div class="set-row"><span>Auf den Home-Bildschirm</span><span class="muted" style="text-align:right;font-size:14px">iPhone: Teilen → „Zum Home-Bildschirm“</span></div>`}
-    <div class="set-row"><span>Version</span><span class="muted">mobil 3.1${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
+    <div class="set-row"><span>Version</span><span class="muted">mobil 3.2${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
     <button type="button" class="btn danger wide" id="logout">Abmelden</button>`;
   $("set-wrap").hidden = false;
 }
@@ -287,10 +287,42 @@ $("set").addEventListener("click", async (e) => { if (e.target.id === "logout") 
 // Sheets schließen: Hintergrund tippen oder nach unten wischen
 document.querySelectorAll(".sheet-wrap").forEach((w) => {
   w.addEventListener("click", (e) => { if (e.target === w) { if (w.id === "det-wrap") saveDetFields(); closeSheet(w); } });
-  let y0 = null; const sh = w.querySelector(".sheet");
-  sh.addEventListener("touchstart", (e) => { y0 = e.target.closest(".grab") ? e.touches[0].clientY : null; if (y0 !== null) sh.style.transition = "none"; }, { passive: true });
-  sh.addEventListener("touchmove", (e) => { if (y0 === null) return; const dy = e.touches[0].clientY - y0; sh.style.transform = `translateY(${dy > 0 ? dy : dy / 6}px)`; }, { passive: true });
-  sh.addEventListener("touchend", (e) => { if (y0 === null) return; const dy = e.changedTouches[0].clientY - y0; sh.style.transition = ""; sh.style.transform = ""; y0 = null; if (dy > 110) { if (w.id === "det-wrap") saveDetFields(); closeSheet(w); } });
+  // Ziehen geht überall auf dem Sheet, sobald es ganz oben gescrollt ist (nicht nur am Griff).
+  // Seitliches Wischen (Farb-/Landschaftsreihen), Schieberegler und Textfelder bleiben unberührt.
+  const sh = w.querySelector(".sheet"); let g = null;
+  const close = () => { if (w.id === "det-wrap") saveDetFields(); closeSheet(w); };
+  sh.addEventListener("touchstart", (e) => {
+    if (e.touches.length !== 1) { g = null; return; }
+    const t = e.target, onGrab = !!t.closest(".grab");
+    if (!onGrab && t.closest("input[type=range], textarea, input:not([type=checkbox]):not([type=radio]), select, [contenteditable]")) { g = null; return; }
+    g = { y0: e.touches[0].clientY, x0: e.touches[0].clientX, t0: Date.now(), dy: 0, lock: onGrab ? "y" : null, top: sh.scrollTop <= 0, onGrab, lastY: e.touches[0].clientY, lastT: Date.now(), v: 0 };
+  }, { passive: true });
+  sh.addEventListener("touchmove", (e) => {
+    if (!g) return;
+    const y = e.touches[0].clientY, dy = y - g.y0, dx = e.touches[0].clientX - g.x0;
+    if (g.lock === null) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      // nur nach unten ziehen, wenn ganz oben – sonst normal scrollen
+      g.lock = Math.abs(dy) > Math.abs(dx) && dy > 0 && g.top && sh.scrollTop <= 0 ? "y" : "no";
+      if (g.lock === "y") { g.y0 = y; sh.style.transition = "none"; w.style.transition = "none"; }
+    }
+    if (g.lock !== "y") return;
+    e.preventDefault();
+    const d = y - g.y0; g.dy = d;
+    const now = Date.now(); g.v = (y - g.lastY) / Math.max(1, now - g.lastT); g.lastY = y; g.lastT = now;
+    sh.style.transform = `translateY(${d > 0 ? d : d / 6}px)`;
+    w.style.backgroundColor = `rgb(8 6 14 / ${Math.max(0, .45 * (1 - Math.max(0, d) / (sh.offsetHeight || 600)))})`;
+  }, { passive: false });
+  const end = () => {
+    if (!g) return; const { lock, dy, v } = g; g = null;
+    if (lock !== "y") return;
+    sh.style.transition = ""; w.style.transition = "background-color .2s ease";
+    if (dy > 110 || (dy > 30 && v > 0.5)) {
+      sh.style.transform = `translateY(${sh.offsetHeight + 40}px)`; w.style.backgroundColor = "rgb(8 6 14 / 0)";
+      setTimeout(() => { w.classList.add("instant"); close(); setTimeout(() => { sh.style.transform = ""; w.style.backgroundColor = ""; w.style.transition = ""; w.classList.remove("instant"); }, 260); }, 220);
+    } else { sh.style.transform = ""; w.style.backgroundColor = ""; }
+  };
+  sh.addEventListener("touchend", end); sh.addEventListener("touchcancel", end);
 });
 
 // ---------- Toast ----------

@@ -369,3 +369,8 @@ function findRender() {
 $("search-btn").addEventListener("click", () => { $("find-in").value = ""; findRender(); $("find-wrap").hidden = false; setTimeout(() => $("find-in").focus(), 80); });
 $("find-in").addEventListener("input", findRender);
 $("find-list").addEventListener("click", () => setTimeout(() => { if (!$("det-wrap").hidden) closeSheet($("find-wrap")); }, 0));
+
+// ---------- Drehen: Übergänge kurz aus, damit nichts hinterherruckelt ----------
+let rsT = 0;
+const rsOn = () => { document.body.classList.add("resizing"); clearTimeout(rsT); rsT = setTimeout(() => document.body.classList.remove("resizing"), 350); };
+addEventListener("resize", rsOn); addEventListener("orientationchange", rsOn);

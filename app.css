@@ -303,3 +303,8 @@ body.dragging-ev { -webkit-user-select: none; user-select: none; }
 .top > .feier { order: 10; flex: 0 0 100%; max-width: 100%; margin-top: 6px; }
 .top > .wx-now { order: 11; }
 .top .icon-btn { width: 40px; height: 40px; }
+
+/* Sheet nach dem Runterwischen ohne zweite Animation schließen */
+.sheet-wrap.instant, .sheet-wrap.instant .sheet { animation: none !important; }
+/* Drehen / Größe ändern: keine nachlaufenden Übergänge */
+body.resizing *, body.resizing *::before, body.resizing *::after { transition: none !important; }
