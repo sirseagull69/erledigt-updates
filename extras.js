@@ -48,7 +48,7 @@ function feierabendText() {
 const CLOCK = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 function feierUpdate() {
   let el = $("feier");
-  if (!el) { el = document.createElement("button"); el.type = "button"; el.id = "feier"; el.className = "feier"; document.querySelector(".top-txt").appendChild(el); }
+  if (!el) { el = document.createElement("button"); el.type = "button"; el.id = "feier"; el.className = "feier"; document.querySelector(".top").appendChild(el); }
   const f = feierabendText();
   el.hidden = !f; if (!f) return;
   el.classList.toggle("party", !!f.party);
@@ -256,7 +256,7 @@ function wxRows() {
 }
 function wxHead() {
   let el = $("wx-now");
-  if (!el) { el = document.createElement("button"); el.type = "button"; el.id = "wx-now"; el.className = "wx-now"; document.querySelector(".top-txt").appendChild(el); }
+  if (!el) { el = document.createElement("button"); el.type = "button"; el.id = "wx-now"; el.className = "wx-now"; document.querySelector(".top").appendChild(el); }
   const d = dayWx(iso(todayD()));
   el.hidden = !d; if (!d) return;
   el.innerHTML = WX[wxKind(d.c)] + `${d.hi}°<small>${d.lo}°</small>`;
@@ -310,3 +310,62 @@ document.addEventListener("touchmove", (e) => {
 }, { passive: false });
 document.addEventListener("touchend", () => dragEnd(true));
 document.addEventListener("touchcancel", () => dragEnd(false));
+
+// ---------- Einstellungen auf allen Geräten gleich (Supabase: user_settings, wie am PC) ----------
+// Abgeglichen: Farbe, Landschaft, Himmel an/aus, Hell/Dunkel, Arbeitszeit, Wetter-Ort. Arbeit/Privat bleibt je Gerät.
+let setRemote = {}, setSent = "", setUid = null, setChan = null;
+const sUid = () => session?.user?.id || null;
+function settingsSnap() {
+  return Object.assign({}, setRemote, {
+    preset: design.preset || "standard", scene: design.scene || "wald", sceneOn: !!design.w.scene,
+    place: design.place || setRemote.place || null, start: design.start || "07:30", end: design.end ?? "16:30", theme: design.theme || "system",
+  });
+}
+function settingsApply(d) {
+  if (!d || typeof d !== "object") return;
+  setRemote = d;
+  const placeBefore = JSON.stringify(design.place || null);
+  if (d.preset && PRESETS[d.preset]) design.preset = d.preset;
+  if (d.scene) design.scene = d.scene;
+  if (typeof d.sceneOn === "boolean") design.w.scene = d.sceneOn;
+  if (d.place) design.place = d.place;
+  if (/^\d{2}:\d{2}$/.test(d.start || "")) design.start = d.start;
+  if (typeof d.end === "string") design.end = d.end || "16:30";
+  if (d.theme) design.theme = d.theme;
+  saveDesign(); applyDesign(); feierUpdate(); if (typeof sceneSync === "function") sceneSync();
+  if (JSON.stringify(design.place || null) !== placeBefore) { window.__scene?.reloadWeather?.(); loadWeek(true); }
+  if (!$("set-wrap").hidden) openSet();
+}
+async function settingsPush() {
+  const snap = settingsSnap(), s = JSON.stringify(snap);
+  if (s === setSent) return;
+  setSent = s;
+  const { error } = await sb.from("user_settings").upsert({ user_id: sUid(), data: snap, updated_at: new Date().toISOString() });
+  if (error) { console.warn("Einstellungen:", error.message); setSent = ""; }
+}
+async function settingsInit() {
+  const u = sUid(); if (!u || setUid === u) return;
+  setUid = u;
+  const { data, error } = await sb.from("user_settings").select("data").maybeSingle();
+  if (error) { setUid = null; return; }
+  if (data?.data && Object.keys(data.data).length) { settingsApply(data.data); setSent = JSON.stringify(settingsSnap()); }
+  else settingsPush();
+  if (setChan) sb.removeChannel(setChan);
+  setChan = sb.channel("einstellungen-" + u).on("postgres_changes", { event: "*", schema: "public", table: "user_settings", filter: `user_id=eq.${u}` }, (p) => {
+    const d = p.new?.data; if (!d || JSON.stringify(d) === setSent) return;
+    settingsApply(d); setSent = JSON.stringify(settingsSnap());
+  }).subscribe();
+}
+setInterval(() => { if (!sUid() || !loaded) return; if (setUid !== sUid()) settingsInit(); else settingsPush(); }, 2000);
+
+// ---------- Suche (wie am PC: Titel, Notizen, Unterpunkte – auch Erledigtes) ----------
+function findRender() {
+  const q = $("find-in").value.trim().toLowerCase();
+  if (!q) { $("find-list").innerHTML = '<div class="empty" style="padding:24px">Tippe etwas ein.</div>'; return; }
+  const hit = (t) => [t.title, t.notes, ...(t.checklist || []).map((c) => c.text)].some((x) => String(x || "").toLowerCase().includes(q));
+  const res = items.filter((t) => !t.archived && hit(t)).sort((a, b) => (a.done - b.done) || ((b.createdAt || 0) - (a.createdAt || 0))).slice(0, 60);
+  $("find-list").innerHTML = res.length ? res.map(taskHtml).join("") : '<div class="empty" style="padding:24px">Nichts gefunden.</div>';
+}
+$("search-btn").addEventListener("click", () => { $("find-in").value = ""; findRender(); $("find-wrap").hidden = false; setTimeout(() => $("find-in").focus(), 80); });
+$("find-in").addEventListener("input", findRender);
+$("find-list").addEventListener("click", () => setTimeout(() => { if (!$("det-wrap").hidden) closeSheet($("find-wrap")); }, 0));
