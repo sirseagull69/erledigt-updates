@@ -16,14 +16,24 @@ self.addEventListener("fetch", (e) => {
 // Push-Erinnerung vom Server (Supabase-Funktion push-reminders)
 self.addEventListener("push", (e) => {
   let d = {}; try { d = e.data.json(); } catch { d = { title: "Erledigt", body: e.data?.text() || "" }; }
+  // Knöpfe nur bei Aufgaben mit Unterschrift (Android/Chrome zeigen sie, iPhone ignoriert sie)
+  const actions = d.task && d.sig ? [{ action: "done", title: "✓ Erledigt" }, { action: "snooze", title: "In 15 Min" }] : [];
   e.waitUntil(self.registration.showNotification(d.title || "Erledigt", {
-    body: d.body || "", tag: d.tag || undefined, renotify: true, icon: "icons/icon-192.png", badge: "icons/icon-192.png", data: { task: d.task || null },
+    body: d.body || "", tag: d.tag || undefined, renotify: true, icon: "icons/icon-192.png", badge: "icons/icon-192.png", actions,
+    data: { task: d.task || null, uid: d.uid, exp: d.exp, sig: d.sig, tz: d.tz },
   }));
 });
 // Antippen: offene App nach vorne holen (und Aufgabe öffnen), sonst neu starten
+const ACTION_URL = "https://ovosbxkwqgxxfekrtlov.supabase.co/functions/v1/push-action";
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const task = e.notification.data?.task;
+  const data = e.notification.data || {}, task = data.task;
+  if ((e.action === "done" || e.action === "snooze") && data.sig) {
+    // Direkt erledigen/verschieben, ohne die App zu öffnen. Klappt es nicht, wird die Aufgabe geöffnet.
+    return e.waitUntil(fetch(ACTION_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data, action: e.action }) })
+      .then((r) => { if (!r.ok) throw new Error(r.status); })
+      .catch(() => self.clients.openWindow("./?task=" + encodeURIComponent(task))));
+  }
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((cs) => {
     const c = cs.find((x) => new URL(x.url).origin === location.origin);
     if (c) { if (task) c.postMessage({ type: "open-task", task }); return c.focus(); }
