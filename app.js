@@ -105,15 +105,7 @@ window.addEventListener("online", () => session && fetchAll());
 const setSync = (on) => { $("sync").classList.toggle("off", !on); $("sync").title = on ? "Synchronisiert" : "Keine Verbindung"; };
 
 // ---------- Feiertage (wie am PC, Baden-Württemberg) ----------
-const holCache = {};
-function holidays(y) {
-  if (holCache[y]) return holCache[y];
-  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const easter = new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1), E = (n) => iso(addDays(easter, n)), D = (mo, dd) => iso(new Date(y, mo - 1, dd));
-  const out = {}; [[D(1, 1), "Neujahr"], [D(1, 6), "Heilige Drei Könige"], [E(-2), "Karfreitag"], [E(1), "Ostermontag"], [D(5, 1), "Tag der Arbeit"], [E(39), "Christi Himmelfahrt"], [E(50), "Pfingstmontag"], [E(60), "Fronleichnam"], [D(10, 3), "Tag der Deutschen Einheit"], [D(11, 1), "Allerheiligen"], [D(12, 25), "1. Weihnachtstag"], [D(12, 26), "2. Weihnachtstag"]].forEach(([k2, n]) => (out[k2] = n));
-  return (holCache[y] = out);
-}
-const holidayOf = (k) => holidays(+k.slice(0, 4))[k] || "";
+// Feiertage kommen aus shared.js (gleich wie am PC)
 
 // ---------- Anzeige-Helfer ----------
 function dueLabel(k) {
@@ -178,12 +170,12 @@ function renderCal() {
   for (let i = 0; i < 42; i++) {
     const d = addDays(start, i), k = iso(d), ev = onDay(k).filter((t) => !t.done), we = d.getDay() === 0 || d.getDay() === 6;
     if (i >= 35 && d.getMonth() !== m) break;
-    cells += `<button type="button" class="day${d.getMonth() !== m ? " other" : ""}${we ? " we" : ""}${holidayOf(k) ? " hol" : ""}${k === today ? " today" : ""}${k === calSel ? " sel" : ""}" data-day="${k}"><span class="n">${d.getDate()}</span><span class="dots">${ev.slice(0, 3).map((t) => `<i style="--c:${listById[t.list].dot}"></i>`).join("")}</span></button>`;
+    cells += `<button type="button" class="day${d.getMonth() !== m ? " other" : ""}${we ? " we" : ""}${holidayOf(k)?.pub ? " hol" : ""}${k === today ? " today" : ""}${k === calSel ? " sel" : ""}" data-day="${k}"><span class="n">${d.getDate()}</span><span class="dots">${ev.slice(0, 3).map((t) => `<i style="--c:${listById[t.list].dot}"></i>`).join("")}</span></button>`;
   }
   const sel = onDay(calSel).sort(sortT), sd = parseIso(calSel);
   $("view-cal").innerHTML = `<div class="cal-nav"><b>${MONTHS[m]} ${first.getFullYear()}</b><button type="button" data-cal="-1" aria-label="Voriger Monat">‹</button><button type="button" data-cal="0">Heute</button><button type="button" data-cal="1" aria-label="Nächster Monat">›</button></div>
     <div class="cal">${cells}</div>
-    <div class="day-head"><b>${WD[sd.getDay()]}, ${sd.getDate()}. ${MONTHS[sd.getMonth()]}</b>${holidayOf(calSel) ? `<small>${holidayOf(calSel)}</small>` : ""}<span class="hint">+ trägt für diesen Tag ein</span></div>
+    <div class="day-head"><b>${WD[sd.getDay()]}, ${sd.getDate()}. ${MONTHS[sd.getMonth()]}</b>${holidayOf(calSel) ? `<small>${holidayOf(calSel).name}</small>` : ""}<span class="hint">+ trägt für diesen Tag ein</span></div>
     ${sel.length ? sel.map(taskHtml).join("") : '<div class="empty" style="padding:20px">Nichts an diesem Tag.</div>'}`;
 }
 
@@ -285,7 +277,7 @@ function openSet() {
   $("set").innerHTML = `<h2 style="margin:4px 0">Einstellungen</h2>
     <div class="set-row"><span>Angemeldet als</span><b style="overflow:hidden;text-overflow:ellipsis">${esc(session?.user?.email || "")}</b></div>
     ${/ErledigtAndroid/.test(navigator.userAgent) ? "" : `<div class="set-row"><span>Auf den Home-Bildschirm</span><span class="muted" style="text-align:right;font-size:14px">iPhone: Teilen → „Zum Home-Bildschirm“</span></div>`}
-    <div class="set-row"><span>Version</span><span class="muted">mobil 2.4${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
+    <div class="set-row"><span>Version</span><span class="muted">mobil 3.0${/ErledigtAndroid/.test(navigator.userAgent) ? " · Android" : ""}</span></div>
     <button type="button" class="btn danger wide" id="logout">Abmelden</button>`;
   $("set-wrap").hidden = false;
 }

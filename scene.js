@@ -8,10 +8,10 @@
 var sceneSync = null;
 (() => {
 if (MINI) return;
-const hdr = document.querySelector("main > header"); if (!hdr) return;
+const hdr = document.getElementById("hero") || document.querySelector("main > header"); if (!hdr) return;
 const box = document.createElement("div"); box.className = "sc"; box.setAttribute("aria-hidden", "true");
 box.innerHTML = '<svg viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><svg class="sc-move" viewBox="0 0 900 210" preserveAspectRatio="xMidYMax slice"></svg><div class="sc-grain"></div><div class="sc-rain"></div><div class="sc-snow"></div><div class="sc-flash"></div>';
-(document.querySelector(".hello") || hdr).prepend(box);
+(document.getElementById("hero") || document.querySelector(".hello") || hdr).prepend(box);
 const svg = box.querySelector("svg"), mv = box.querySelector(".sc-move"), precip = { rain: box.querySelector(".sc-rain"), snow: box.querySelector(".sc-snow") };
 var SC_START = 450, SC_END = 990, SW = 900; // SW: Breite der Szene, passend zum Banner (nichts wird gestreckt oder abgeschnitten)
 const W = { cover: 0, rain: 0, snow: 0, fog: 0, storm: false, sunrise: 0, sunset: 0 }; // sunrise/sunset in Minuten (vom Wetterdienst)

@@ -2,6 +2,16 @@
 // Läuft nach app.js (nutzt store, items, mode, iso, todayD, render, $ …) und vor scene.js.
 "use strict";
 
+// ---------- Android-App: Seite liegt randlos unter Status- und Navigationsleiste ----------
+// Die App übergibt die Leistenhöhen (?sb=…&nb=…); gemerkt, falls die Adresse später ohne kommt.
+(() => {
+  const q = new URLSearchParams(location.search);
+  let bars = null;
+  if (q.has("sb")) { bars = { sb: +q.get("sb") || 0, nb: +q.get("nb") || 0 }; store.set("em-bars", bars); }
+  else if (/ErledigtAndroid/.test(navigator.userAgent)) bars = store.get("em-bars", null);
+  if (bars) { const r = document.documentElement.style; r.setProperty("--safe-t", bars.sb + "px"); r.setProperty("--safe-b", bars.nb + "px"); }
+})();
+
 // ---------- Einstellungen (nur auf diesem Handy) ----------
 var MINI = false; // für scene.js (Desktop-Code)
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
@@ -226,17 +236,7 @@ toggleDone = function (id) {
 
 
 // ---------- Wetter (wie am PC): heute im Kopf, 7 Tage beim Antippen, Symbole im Kalender ----------
-const WX = {
-  sun: '<svg viewBox="0 0 24 24" width="22" height="22"><circle cx="12" cy="12" r="4.5" fill="#F5B83D"/><g stroke="#F5B83D" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></g></svg>',
-  part: '<svg viewBox="0 0 24 24" width="22" height="22"><circle cx="9" cy="9" r="3.6" fill="#F5B83D"/><g stroke="#F5B83D" stroke-width="1.8" stroke-linecap="round"><path d="M9 2.5v1.4M2.5 9h1.4M4.4 4.4l1 1M13.6 4.4l-1 1"/></g><path d="M8 19.5h9a3.5 3.5 0 0 0 .3-7 5 5 0 0 0-9.5 1.3A2.9 2.9 0 0 0 8 19.5z" fill="#C9D3E0"/></svg>',
-  cloud: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 19h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 19z" fill="#AEB8C6"/></svg>',
-  fog: '<svg viewBox="0 0 24 24" width="22" height="22"><g stroke="#AEB8C6" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M6 13h12M4 17h16"/></g></svg>',
-  rain: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 15h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 15z" fill="#AEB8C6"/><g stroke="#5AA2E8" stroke-width="2" stroke-linecap="round"><path d="M8.5 17.5l-1 2.5M12.5 17.5l-1 2.5M16.5 17.5l-1 2.5"/></g></svg>',
-  snow: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 14.5h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 14.5z" fill="#AEB8C6"/><g fill="#DDEBFA"><circle cx="8.5" cy="18" r="1.3"/><circle cx="12.5" cy="20" r="1.3"/><circle cx="16.5" cy="18" r="1.3"/></g></svg>',
-  storm: '<svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 14.5h10.5a4 4 0 0 0 .4-8 5.6 5.6 0 0 0-10.7 1.5A3.3 3.3 0 0 0 7 14.5z" fill="#8E99A8"/><path d="M12.5 14l-2.5 4h2.5l-1.5 4 4-5.5h-2.6l1.6-2.5z" fill="#F5B83D"/></svg>',
-};
-const wxKind = (c) => c === 0 ? "sun" : c <= 2 ? "part" : c === 3 ? "cloud" : c === 45 || c === 48 ? "fog" : c >= 95 ? "storm" : (c >= 71 && c <= 77) || c === 85 || c === 86 ? "snow" : (c >= 51 && c <= 67) || (c >= 80 && c <= 82) ? "rain" : "cloud";
-const WX_NAME = { sun: "Sonnig", part: "Leicht bewölkt", cloud: "Bewölkt", fog: "Nebel", rain: "Regen", snow: "Schnee", storm: "Gewitter" };
+// Wetter-Symbole (WX, wxKind, WX_NAME) kommen aus shared.js
 let week = store.get("em-woche", null);
 async function loadWeek(force) {
   const pl = (design.place && isFinite(design.place.lat)) ? design.place : { name: "Nufringen", lat: 48.62, lon: 8.89 };
