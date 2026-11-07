@@ -98,6 +98,8 @@ openSet = function () {
     <h3 class="set-h">Farbe</h3><div class="swatches">${sw}</div>
     <h3 class="set-h" id="set-work">Arbeitszeit</h3>
     <div class="set-row"><span>Von – bis</span><span class="set-time"><input type="time" id="ex-von" value="${esc(arbeitsbeginn())}"> – <input type="time" id="ex-bis" value="${esc(design.end || "16:30")}"></span></div>
+    <h3 class="set-h">Erinnern vor dem Termin</h3>
+    <div class="modes" id="ex-vorlauf">${[[0, "Pünktlich"], [5, "5 Min"], [15, "15 Min"], [30, "30 Min"], [60, "1 Std"]].map(([v, n]) => `<button type="button" data-vorlauf="${v}" aria-pressed="${+(design.vorlauf || 0) === v}">${n}</button>`).join("")}</div>
     <h3 class="set-h">Himmel oben</h3>
     <div class="scene-opts">${[["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"]].map(([k, n]) => `<button type="button" data-scene="${k}" aria-pressed="${(design.scene || "wald") === k}">${n}</button>`).join("")}</div>
     <label class="set-row"><span>Landschaft mit Wetter</span><input type="checkbox" id="ex-scene" class="sw" ${design.w.scene ? "checked" : ""}></label>
@@ -119,6 +121,7 @@ async function placeFind() {
 }
 const changed = () => { saveDesign(); feierUpdate(); if (typeof sceneSync === "function") sceneSync(); };
 $("set").addEventListener("click", (e) => {
+  const vl = e.target.closest("[data-vorlauf]"); if (vl) { design.vorlauf = +vl.dataset.vorlauf; changed(); $("ex-vorlauf").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === vl))); return; }
   const p = e.target.closest("[data-preset]");
   if (p) { design.preset = p.dataset.preset; saveDesign(); applyDesign(); document.querySelectorAll("[data-preset]").forEach((b) => b.setAttribute("aria-pressed", String(b === p))); return; }
   const th = e.target.closest("[data-theme-opt]");
@@ -319,7 +322,7 @@ let setRemote = {}, setSent = "", setUid = null, setChan = null;
 const sUid = () => session?.user?.id || null;
 function settingsSnap() {
   return Object.assign({}, setRemote, {
-    preset: design.preset || "standard", scene: design.scene || "wald", sceneOn: !!design.w.scene,
+    preset: design.preset || "standard", scene: design.scene || "wald", sceneOn: !!design.w.scene, sceneHoch: design.w.hoch !== false, vorlauf: +(design.vorlauf || 0),
     place: design.place || setRemote.place || null, start: design.start || "07:30", end: design.end ?? "16:30", theme: design.theme || "system",
   });
 }
@@ -330,6 +333,8 @@ function settingsApply(d) {
   if (d.preset && PRESETS[d.preset]) design.preset = d.preset;
   if (d.scene) design.scene = d.scene;
   if (typeof d.sceneOn === "boolean") design.w.scene = d.sceneOn;
+  if (typeof d.sceneHoch === "boolean") design.w.hoch = d.sceneHoch;
+  if (typeof d.vorlauf === "number") design.vorlauf = d.vorlauf;
   if (d.place) design.place = d.place;
   if (/^\d{2}:\d{2}$/.test(d.start || "")) design.start = d.start;
   if (typeof d.end === "string") design.end = d.end || "16:30";
