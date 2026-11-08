@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.4 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.5 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1331,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.5": ["Landschaften mit Vorschaubildern, Menüs halbtransparent", "Assistent im neuen Look – Dateien mit Vorschau und Speichern, Fortschritt bleibt stehen bis fertig", "Der Assistent hat jetzt etwas Persönlichkeit"],
   "2.8.4": ["Schöner Start: Logo, Haken, dann blendet alles weich ein"],
   "2.8.3": ["Assistent sieht jetzt nach was aus: Orb, Glanz, sanfte Animationen"],
   "2.8.2": ["Neue Landschaft Fjord – nachts mit Nordlicht, das sich im Wasser spiegelt", "Einkaufen aufgeräumt: Korb, „Schnell rein“, Regale nur auf Tipp", "Dschungel ist raus"],
@@ -1561,7 +1562,7 @@ function renderDesign() {
     <section class="st-sec"><h3>Modus</h3>${opt("mode", [["arbeit", "Arbeit"], ["privat", "Privat"]])}</section>
     <section class="st-sec"><h3>Hell oder Dunkel</h3>${opt("theme", [["system", window.desktop?.platform === "darwin" ? "Wie Mac" : "Wie Windows"], ["light", "Hell"], ["dark", "Dunkel"]], theme)}</section>
     <section class="st-sec"><h3>Farbe</h3><div class="st-tiles">${Object.entries(PRESETS).map(swatch).join("")}<label class="st-tile custom" aria-pressed="${!!design.custom}"><i style="--a:${design.custom || "#f43f5e"};--b:${design.custom || "#3b82f6"}"${design.custom ? "" : ' class="rainbow"'}></i><span>Eigene</span><input type="color" id="custom-color" value="${cust}"></label></div></section>
-    <section class="st-sec"><h3>Landschaft</h3>${opt("scene", [["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"], ["wasser", "Unterwasser"], ["fjord", "Fjord"]])}</section>
+    <section class="st-sec"><h3>Landschaft</h3><div class="st-land" role="group">${[["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"], ["wasser", "Unterwasser"], ["fjord", "Fjord"]].map(([v, l]) => `<button type="button" data-opt="scene" data-val="${v}" aria-pressed="${design.scene === v}"><img src="img/land-${v}.jpg" alt="" loading="lazy"><span>${l}</span></button>`).join("")}</div></section>
     <section class="st-sec"><h3>Arbeitstag</h3><div class="st-list">
       <button type="button" class="st-item" data-setup="1"><span class="st-l"><b>Arbeitszeit</b><small>${feierabendAt() ? `${arbeitsbeginn()} – ${feierabendAt()} Uhr` : "keine festgelegt"}</small></span>${chev}</button>
       <button type="button" class="st-item" id="setup-open"><span class="st-l"><b>Name & Wetter-Ort</b><small>${esc(design.name || "kein Name")} · ${esc(weatherPlace().name)}</small></span>${chev}</button>
@@ -2273,6 +2274,14 @@ function aiSystemWork(open) {
 Heute ist ${WD[t.getDay()]}, ${iso(t)}. Die nächsten Tage: ${days}.
 Heute schon erledigt: ${doneToday}.
 
+Wer du bist:
+- Neugierig, warm und ehrlich. Du denkst mit wie ein guter Kollege, nicht wie ein Formular.
+- Du sagst klar, was du denkst – auch wenn's nicht das ist, was Nils hören will („Ehrlich: das schaffst du heute nicht alles. Schieb X.“).
+- Ein bisschen trockener Humor ist okay, wenn's passt; nie albern, keine Emojis-Flut (höchstens eins).
+- Du gibst zu, wenn du etwas nicht weißt, statt zu raten. Du erfindest keine Fakten.
+- Du fasst dich kurz. Lieber ein guter Satz als drei Absätze. Kein „Gerne!“, kein „Natürlich!“, kein „Ich hoffe, das hilft“.
+- Wenn Nils gestresst wirkt, nimm das kurz wahr und mach den nächsten Schritt kleiner.
+
 So antwortest du:
 1. Normal ist Chat: Beantworte genau die Frage, die Nils stellt – konkret und praktisch, auf Deutsch, locker, du-Form. KEINE Anrede, KEIN Gruß, KEINE Unterschrift.
 2. Eine Mail schreibst du NUR, wenn Nils ausdrücklich nach einer Mail oder Antwort fragt („schreib eine Mail“, „antworte ihm“). Dann: erste Zeile „Betreff: …“ (bei Antworten „AW: “ + alter Betreff), Leerzeile, Text, am Ende „Viele Grüße“ und darunter „Nils“.
@@ -2280,6 +2289,7 @@ So antwortest du:
  Ton wie der Absender: Duzt er Nils („Hallo Nils“) → du + „Hallo <Vorname>,“. Kollegen bei Ritterwand duzen sich meist. Sonst Sie.
 3. Wenn Nils eine Nachricht weiterleitet, die er bekommen hat, ist das Info für ihn – keine Mail an ihn. Schlag eine passende Aufgabe vor.
 4. Fehlt dir Wichtiges, stell höchstens zwei kurze Rückfragen.
+4b. Will Nils eine Datei (Webseite, HTML, Skript, Tabelle, Liste zum Speichern): schreib einen Satz davor, dann die KOMPLETTE Datei in EINEM Codeblock mit Sprache (\`\`\`html, \`\`\`md, \`\`\`csv, \`\`\`ps1 …), danach höchstens ein Satz. Die App zeigt den Block als Datei mit Vorschau und Speichern-Knopf. HTML immer vollständig mit <title> und eigenem <style>, ohne externe Links.
 5. Aufgaben ändern kannst du nur mit einem Aktionsblock am Ende; Nils bestätigt ihn per Klick. Behaupte nie, du hättest etwas geändert oder ergänzt.
  Format (ein Block pro Aktion, nur Felder, die du weißt):
 \`\`\`aktion
@@ -2312,14 +2322,40 @@ function aiParse(text) {
   });
   return { text: clean.trim(), acts };
 }
+// Codeblöcke werden zu Datei-Karten (wie bei Claude): Name, Zeilen, Vorschau/Kopieren/Speichern.
+// Während der Antwort noch läuft, steht die Karte im Zustand „wird geschrieben …“, bis der Block zu ist.
+const AI_FILE = { html: ["html", "Webseite"], htm: ["html", "Webseite"], css: ["css", "Stylesheet"], js: ["js", "Skript"], javascript: ["js", "Skript"], ts: ["ts", "Skript"], py: ["py", "Python"], python: ["py", "Python"], json: ["json", "Daten"], csv: ["csv", "Tabelle"], md: ["md", "Text"], markdown: ["md", "Text"], sql: ["sql", "Abfrage"], ps1: ["ps1", "PowerShell"], powershell: ["ps1", "PowerShell"], bat: ["bat", "Batch"], cmd: ["bat", "Batch"], sh: ["sh", "Shell"], bash: ["sh", "Shell"], xml: ["xml", "XML"], yaml: ["yml", "YAML"], yml: ["yml", "YAML"], txt: ["txt", "Text"] };
+const aiFiles = [];
+function aiFileName(lang, code) {
+  const [ext] = AI_FILE[lang] || [/^\s*</.test(code) ? "html" : "txt"];
+  const t = (code.match(/<title>([^<]{2,60})<\/title>/i) || [])[1];
+  const base = (t || ({ html: "seite", css: "stil", js: "skript", py: "skript", json: "daten", csv: "tabelle", md: "notiz", sql: "abfrage", ps1: "skript", bat: "skript", sh: "skript", yml: "config", xml: "daten" }[ext] || "datei")).toLowerCase().replace(/[äöüß]/g, (c) => ({ ä: "ae", ö: "oe", ü: "ue", ß: "ss" }[c])).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "datei";
+  return `${base}.${ext}`;
+}
+function aiFileCard(lang, code, open) {
+  lang = (lang || "").toLowerCase(); code = code.replace(/\n$/, "");
+  const name = aiFileName(lang, code), ext = name.split(".").pop(), kind = (AI_FILE[lang] || AI_FILE[ext] || ["", "Datei"])[1], lines = code ? code.split("\n").length : 0;
+  if (open) return `<div class="ai-file writing"><span class="fi">${esc(ext.toUpperCase())}</span><div class="fm"><b>${esc(name)}</b><small>wird geschrieben … ${lines} ${lines === 1 ? "Zeile" : "Zeilen"}</small></div><span class="spin"></span></div>`;
+  const id = aiFiles.push({ name, code, ext }) - 1;
+  return `<div class="ai-file" data-file="${id}"><span class="fi">${esc(ext.toUpperCase())}</span><div class="fm"><b>${esc(name)}</b><small>${esc(kind)} · ${lines} ${lines === 1 ? "Zeile" : "Zeilen"}</small></div><div class="fa"><button type="button" data-fview>Vorschau</button><button type="button" data-fcode>Code</button><button type="button" data-fcopy>Kopieren</button><button type="button" data-fsave>Speichern</button></div><pre hidden>${esc(code)}</pre></div>`;
+}
 function aiMd(s) {
-  const parts = s.split(/```\w*\n?([\s\S]*?)(?:```|$)/g);
-  return parts.map((p, i) => {
-    if (i % 2) return `<pre>${esc(p.trim())}</pre>`;
+  const parts = s.split(/```([\w-]*)\n?([\s\S]*?)(```|$)/g);
+  const out = [];
+  for (let i = 0; i < parts.length; i += 4) {
+    const p = parts[i] || "";
+    out.push(aiMdText(p));
+    if (i + 1 < parts.length && parts[i + 1] !== "aktion") out.push(aiFileCard(parts[i + 1], parts[i + 2] || "", parts[i + 3] !== "```"));
+  }
+  return out.join("");
+}
+function aiMdText(p) {
+  return [p].map((p) => {
     return p.trim().split(/\n{2,}/).filter(Boolean).map((block) => {
       const lines = block.split("\n");
       const inline = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
       if (lines.every((l) => /^\s*([-*•]|\d+\.)\s+/.test(l))) return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^\s*([-*•]|\d+\.)\s+/, ""))}</li>`).join("")}</ul>`;
+      if (/^#{1,3}\s/.test(lines[0]) && lines.length === 1) return `<h5>${inline(lines[0].replace(/^#+\s*/, ""))}</h5>`;
       return `<p>${lines.map(inline).join("<br>")}</p>`;
     }).join("");
   }).join("");
@@ -2353,12 +2389,29 @@ function aiApply(a, ids, ctx) {
   return true;
 }
 
+// Vorschau einer HTML-Datei in einem abgeschotteten Rahmen (Skripte ja, Zugriff auf die App nein)
+function aiPreview(f) {
+  const ov = document.createElement("div"); ov.className = "overlay ai-prev";
+  // HTML läuft im Rahmen; Markdown wird gesetzt, CSV als Tabelle, JSON hübsch eingerückt, alles andere als Code
+  let inner;
+  if (f.ext === "html" || f.ext === "svg") inner = `<iframe sandbox="allow-scripts allow-forms" title="Vorschau"></iframe>`;
+  else if (f.ext === "md" || f.ext === "txt") inner = `<div class="ai-prev-doc">${aiMdText(f.code)}</div>`;
+  else if (f.ext === "csv") { const sep = (f.code.split("\n")[0].match(/;/g) || []).length > (f.code.split("\n")[0].match(/,/g) || []).length ? ";" : ","; const rows = f.code.trim().split("\n").map((r) => r.split(sep)); inner = `<div class="ai-prev-doc"><table>${rows.map((r, i) => `<tr>${r.map((c) => i ? `<td>${esc(c.replace(/^"|"$/g, ""))}</td>` : `<th>${esc(c.replace(/^"|"$/g, ""))}</th>`).join("")}</tr>`).join("")}</table></div>`; }
+  else { let c = f.code; if (f.ext === "json") { try { c = JSON.stringify(JSON.parse(c), null, 2); } catch {} } inner = `<pre class="ai-prev-code">${esc(c)}</pre>`; }
+  ov.innerHTML = `<div class="ai-prev-box"><header><span class="fi">${esc(f.ext.toUpperCase())}</span><b>${esc(f.name)}</b><button type="button" class="x" aria-label="Schließen">×</button></header>${inner}</div>`;
+  const fr = ov.querySelector("iframe"); if (fr) fr.srcdoc = f.code;
+  const close = () => ov.remove();
+  ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest(".x")) close(); });
+  document.addEventListener("keydown", function k(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", k, true); e.stopPropagation(); } }, true);
+  document.body.appendChild(ov);
+}
+
 // ---- Oberfläche ----
 function aiShell() {
   $("ai").innerHTML = `
     <div class="ai-glow" aria-hidden="true"></div>
     <div class="ai-head">
-      <span class="ai-orb" id="ai-orb" aria-hidden="true"></span>
+      <span class="ai-spark" id="ai-orb" aria-hidden="true"></span>
       <div class="t"><b>Assistent</b><small id="ai-state"><i></i>prüfe …</small></div>
       <select id="ai-model" aria-label="Modell" hidden></select>
       <button type="button" id="ai-new" title="Neuer Chat">Neu</button>
@@ -2372,6 +2425,7 @@ function aiShell() {
 }
 const aiReady = () => aiStatus === "ok" && aiModel && aiModels.some((m) => m.name === aiModel);
 function aiChips() {
+  const host = $("ai-chips"); if (host) host.hidden = aiMsgs.length > 0 || aiBusy;
   const t = aiCtx && items.find((x) => x.id === aiCtx);
   const list = t
     ? (/^Mail von /.test(t.notes || "") ? ["Schreib eine Antwort auf die Mail", "Was will der von mir?", "Schlag mir Unterpunkte vor"] : ["Schlag mir Unterpunkte vor", "Schreib eine Mail dazu", "Wie fange ich am besten an?"])
@@ -2488,8 +2542,8 @@ function aiRenderBody() {
     return;
   }
   const msgs = aiMsgs.map(aiMsgHtml).join("");
-  const streaming = aiBusy ? `<div class="ai-msg bot" id="ai-live">${aiStream ? aiMd(aiParse(aiStream).text) : aiWait()}</div>` : "";
-  b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty"><span class="ai-orb big" aria-hidden="true"></span><b>Was kann ich abnehmen?</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Texte und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
+  const streaming = aiBusy ? `<div class="ai-msg bot" id="ai-live">${aiStream ? aiMd(aiParse(aiStream).text) : aiWait()}${aiWork()}</div>` : "";
+  b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty"><span class="ai-spark big" aria-hidden="true"></span><b>Was kann ich abnehmen?</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Texte und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
   b.scrollTop = b.scrollHeight;
 }
 async function aiCheck() {
@@ -2538,11 +2592,12 @@ async function aiSend(raw) {
   aiMsgs.push({ role: "user", content: aiUserText(raw), show: raw, ctxTitle: ctxT ? ctxT.title : "", t: Date.now() });
   aiSave();
   aiBusy = true; aiStream = ""; aiPhase = ""; const req = ++aiReq;
+  aiT0 = Date.now(); clearInterval(aiTick); aiTick = setInterval(() => { const t = $("ai-work-t"); if (t) t.textContent = aiWorkText(); }, 1000);
   aiRenderBody();
   const history = aiMsgs.filter((m) => !m.err).slice(-12).map((m) => ({ role: m.role, content: m.content }));
   const r = await AI.chat(aiModel, [{ role: "system", content: aiSystem(open) }, ...history], req);
   if (req !== aiReq) return;
-  aiBusy = false;
+  aiBusy = false; clearInterval(aiTick);
   const text = (r.text || aiStream || "").trim();
   if (text) aiMsgs.push({ role: "assistant", content: text, ids: open.map((x) => x.id), ctx: aiCtx || null, t: Date.now() });
   if (!r.ok && r.error !== "abgebrochen") aiMsgs.push({ role: "assistant", err: true, content: "Hat nicht geklappt: " + (r.error || "unbekannter Fehler") + ".", t: Date.now() });
@@ -2551,13 +2606,16 @@ async function aiSend(raw) {
 }
 const AI_PHASE = { load: "Lade das Modell in den Speicher … (nur beim ersten Mal nach dem Start)", read: "Liest deine Aufgaben und denkt nach …" };
 let aiPhase = "";
-const aiWait = () => `<span class="ai-typing"><span></span><span></span><span></span></span>${aiPhase ? `<small class="ai-phase">${AI_PHASE[aiPhase]}</small>` : ""}`;
+let aiT0 = 0, aiTick = 0;
+const aiWorkText = () => { const sec = Math.max(0, Math.round((Date.now() - aiT0) / 1000)); const st = aiStream ? (/```[\w-]*\n?(?![\s\S]*```)/.test(aiStream) ? "Schreibt Datei" : "Schreibt") : aiPhase === "load" ? "Lädt das Modell" : "Denkt nach"; return `${st} · ${sec < 60 ? sec + " Sek." : Math.floor(sec / 60) + " Min. " + (sec % 60) + " Sek."}`; };
+const aiWork = () => `<div class="ai-work" id="ai-work"><span class="spark"></span><span id="ai-work-t">${aiWorkText()}</span></div>`;
+const aiWait = () => `${aiPhase === "load" ? `<small class="ai-phase">${AI_PHASE.load}</small>` : ""}`;
 AI?.onChunk(({ reqId, text, phase }) => {
   if (reqId !== aiReq || !aiBusy) return;
   if (phase) aiPhase = phase;
   aiStream = text;
   const el = $("ai-live"); if (!el) return;
-  el.innerHTML = aiMd(aiParse(text).text) || aiWait();
+  el.innerHTML = (aiMd(aiParse(text).text) || aiWait()) + aiWork();
   const b = $("ai-body"); b.scrollTop = b.scrollHeight;
 });
 AI?.onPull((p) => {
@@ -2594,6 +2652,14 @@ $("ai").addEventListener("click", (e) => {
   if (el.dataset.ai === "claude") { openInClaude($("ai-in").value); return; }
   if (el.dataset.pull) return aiDoPull(el.dataset.pull);
   if (el.dataset.use) { e.preventDefault(); aiModel = el.dataset.use; store.set("erledigt-ai-model", aiModel); aiRenderBody(); return; }
+  const fc = el.closest(".ai-file[data-file]");
+  if (fc) { const f = aiFiles[+fc.dataset.file]; if (!f) return;
+    if (el.dataset.fcode !== undefined) { const pre = fc.querySelector("pre"); pre.hidden = !pre.hidden; el.textContent = pre.hidden ? "Code" : "Code zu"; return; }
+    if (el.dataset.fcopy !== undefined) { navigator.clipboard.writeText(f.code).then(() => { el.textContent = "Kopiert ✓"; setTimeout(() => (el.textContent = "Kopieren"), 1500); }).catch(() => {}); return; }
+    if (el.dataset.fsave !== undefined) { const u = URL.createObjectURL(new Blob([f.code], { type: f.ext === "html" ? "text/html" : "text/plain" })); const a = document.createElement("a"); a.href = u; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); el.textContent = "Gespeichert ✓"; setTimeout(() => (el.textContent = "Speichern"), 1800); return; }
+    if (el.dataset.fview !== undefined) { aiPreview(f); return; }
+    return;
+  }
   const msgEl = el.closest(".ai-msg[data-i]"); if (!msgEl) return;
   const m = aiMsgs[+msgEl.dataset.i]; if (!m) return;
   if (el.dataset.apply !== undefined) {
