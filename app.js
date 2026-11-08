@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.8 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.9 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1331,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.9": ["Dein Assistent heißt jetzt Origami – mit eigenem Papiervogel, der beim Arbeiten fliegt"],
   "2.8.8": ["KI-Leistung jetzt in drei Stufen", "Beim Antworten siehst du Schritt für Schritt, was der Assistent gerade macht"],
   "2.8.7": ["Assistent im eigenen Look", "Lade-Kreis beim Schreiben repariert", "Android: Handy-KI mit Gemini Nano (neue App-Version installieren)"],
   "2.8.6": ["Menüs noch durchsichtiger"],
@@ -2230,6 +2231,18 @@ sb.auth.onAuthStateChange((event, s) => {
 // ======================================================================
 // ---------- 1.7: Assistent (lokale KI, eingebaut – optional auch Ollama) ----------
 // ======================================================================
+// ---------- Origami: Name, Vogel und Farben des Assistenten (Brand-Kit „Origami“) ----------
+// Sitzender Vogel = bereit, fliegender Vogel mit Flügelschlag = arbeitet. Farben: abendrot/indigo/wald/graphit nach App-Akzent.
+const ORI_SVG = (cls = "") => `<svg class="ori ${cls}" viewBox="0 0 100 100" aria-hidden="true"><g class="sit"><polygon class="d" points="18,64 8,50 32,60"/><polygon class="m" points="18,64 70,64 52,40"/><polygon class="h" points="36,51 61,52 40,12"/><polygon class="d" points="70,64 86,40 78,62"/><polygon class="s" points="86,40 96,45 84,47"/><polygon class="a" points="36,64 52,64 46,78"/></g><g class="fly"><polygon class="d wb" points="52,46 66,54 80,16"/><polygon class="d" points="16,60 6,48 30,56"/><polygon class="m" points="16,60 82,54 52,46"/><polygon class="h wf" points="52,46 66,54 34,10"/><polygon class="d" points="82,54 92,40 86,57"/><polygon class="s" points="92,40 99,44 90,46"/></g></svg>`;
+const ORI_PAL = { abendrot: ["#c2410c", "#ff8a4c", "#ffc9a8", "#e8590c", "#2d1a10"], indigo: ["#1e3a8a", "#4c6ef5", "#bac8ff", "#3b5bdb", "#0b1437"], wald: ["#1b5e3a", "#2f9e63", "#a7e8c0", "#2b8a57", "#0f2a1b"], graphit: ["#71717a", "#d4d4d8", "#ffffff", "#a1a1aa", "#fb923c"] };
+function oriPalette(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim()); if (!m) return "indigo";
+  const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  if (d < .12) return "graphit";
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360;
+  return h < 55 || h >= 330 ? "abendrot" : h < 175 ? "wald" : h < 290 ? "indigo" : "abendrot";
+}
+const oriVars = (p) => { const c = ORI_PAL[p] || ORI_PAL.indigo; return `--o-d:${c[0]};--o-m:${c[1]};--o-h:${c[2]};--o-a:${c[3]};--o-s:${c[4]}`; };
 const AI = window.desktop?.ai || null;
 const AI_MODELS = [
   { id: "intern:qwen3-4b", name: "Empfohlen", size: "ca. 2,5 GB", note: "gute Texte, braucht ca. 4–5 GB freien RAM" },
@@ -2270,7 +2283,7 @@ function aiSystem(open) {
   const n = userName();
   if (!privMode() && n === "Nils") return p;
   if (privMode()) {
-    p = p.replace(/^Du bist der Assistent[^\n]*\n/, `Du bist der Assistent in „Erledigt“, der To-do-App von ${n}. ${n} nutzt die App privat: Haushalt, Einkaufen, Termine, Freizeit.\n`)
+    p = p.replace(/^Du bist Origami[^\n]*\n/, `Du bist Origami, der Assistent in „Erledigt“, der To-do-App von ${n}. Dein Name kommt vom gefalteten Papiervogel – du faltest große Aufgaben in kleine. ${n} nutzt die App privat: Haushalt, Einkaufen, Termine, Freizeit.\n`)
       .replace(" Kollegen bei Ritterwand duzen sich meist. Sonst Sie.", " Sonst Sie.")
       .replace(/Beispiel – Nils:[\s\S]*?mit diesen Punkten\.\n/, `Beispiel – ${n}: „Wie krieg ich die Wohnung bis Samstag sauber?“\nDu: „So würd ich's aufteilen:\n- Donnerstag: Bad und Küche\n- Freitag: Staubsaugen und Wischen\n- Samstag früh: Betten, Müll, kurz durchlüften“ und dazu ein Aktionsblock „unterpunkte“ mit diesen Punkten.\n`);
   }
@@ -2280,7 +2293,7 @@ function aiSystemWork(open) {
   const t = todayD();
   const days = Array.from({ length: 8 }, (_, i) => { const d = addDays(t, i); return `${WD[d.getDay()]} ${iso(d)}`; }).join(", ");
   const doneToday = items.filter((x) => x.done && x.doneAt && iso(new Date(x.doneAt)) === iso(t)).length;
-  return `Du bist der Assistent in „Erledigt“, der To-do-App von Nils. Nils arbeitet im IT-Support bei Ritterwand.
+  return `Du bist Origami, der Assistent in „Erledigt“, der To-do-App von Nils. Dein Name kommt vom gefalteten Papiervogel – du faltest große Aufgaben in kleine. Nils arbeitet im IT-Support bei Ritterwand.
 Heute ist ${WD[t.getDay()]}, ${iso(t)}. Die nächsten Tage: ${days}.
 Heute schon erledigt: ${doneToday}.
 
@@ -2421,8 +2434,8 @@ function aiShell() {
   $("ai").innerHTML = `
     <div class="ai-glow" aria-hidden="true"></div>
     <div class="ai-head">
-      <span class="ai-spark" id="ai-orb" aria-hidden="true"></span>
-      <div class="t"><b>Assistent</b><small id="ai-state"><i></i>prüfe …</small></div>
+      ${ORI_SVG("idle")}
+      <div class="t"><b class="ori-name">Origami</b><small id="ai-state"><i></i>prüfe …</small></div>
       <select id="ai-model" aria-label="Modell" hidden></select>
       <button type="button" id="ai-new" title="Neuer Chat">Neu</button>
       <button type="button" class="x" id="ai-close" aria-label="Schließen (Esc)">×</button>
@@ -2431,7 +2444,7 @@ function aiShell() {
     <div class="ai-body" id="ai-body"></div>
     <div class="ai-ctx" id="ai-ctx" hidden></div>
     <div class="ai-chips" id="ai-chips"></div>
-    <div class="ai-foot"><textarea id="ai-in" rows="1" placeholder="Frag was oder lass dir eine Mail schreiben …" aria-label="Nachricht an den Assistenten"></textarea><button type="button" id="ai-send" aria-label="Senden">${SEND_IC}</button></div>`;
+    <div class="ai-foot"><textarea id="ai-in" rows="1" placeholder="Frag Origami …" aria-label="Nachricht an Origami"></textarea><button type="button" id="ai-send" aria-label="Senden">${SEND_IC}</button></div>`;
 }
 const aiReady = () => aiStatus === "ok" && aiModel && aiModels.some((m) => m.name === aiModel);
 function aiChips() {
@@ -2477,7 +2490,7 @@ function aiRenderHead() {
   const sel = $("ai-model");
   sel.hidden = !(aiStatus === "ok" && aiModels.length > 1);
   sel.innerHTML = aiModels.map((m) => `<option value="${esc(m.name)}"${m.name === aiModel ? " selected" : ""}>${esc(m.label || m.name)}</option>`).join("");
-  $("ai-in").placeholder = aiReady() ? "Frag was oder lass dir eine Mail schreiben …" : "Frage eingeben – Enter öffnet sie in Claude";
+  $("ai-in").placeholder = aiReady() ? "Frag Origami – oder lass dir eine Mail schreiben …" : "Frage eingeben – Enter öffnet sie in Claude";
   $("ai-send").innerHTML = aiBusy ? STOP_IC : SEND_IC;
   $("ai-send").setAttribute("aria-label", aiBusy ? "Stopp" : "Senden");
 }
@@ -2512,7 +2525,7 @@ function aiRenderBody() {
   }
   const msgs = aiMsgs.map(aiMsgHtml).join("");
   const streaming = aiBusy ? `<div class="ai-msg bot" id="ai-live">${aiStream ? aiMd(aiParse(aiStream).text) : aiWait()}${aiWork()}</div>` : "";
-  b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty"><span class="ai-spark big" aria-hidden="true"></span><b>Was kann ich abnehmen?</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Texte und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
+  b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty">${ORI_SVG("big idle")}<b>Hi, ich bin Origami.</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Dateien und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
   b.scrollTop = b.scrollHeight;
 }
 async function aiCheck() {
@@ -2537,7 +2550,7 @@ function aiWarm() {
 function openAi(ctxId, prompt) {
   if (MINI) return;
   if (detailId) closeDetail();
-  if ($("ai").hidden) { aiShell(); aiSliderInit(); $("ai").hidden = false; setTimeout(aiDrawCircuit, 30); $("ai-btn").classList.add("on"); }
+  if ($("ai").hidden) { $("ai").style.cssText = oriVars(oriPalette(getComputedStyle(document.documentElement).getPropertyValue("--accent"))); aiShell(); aiSliderInit(); $("ai").hidden = false; setTimeout(aiDrawCircuit, 30); $("ai-btn").classList.add("on"); }
   if (ctxId !== undefined) aiCtx = ctxId;
   aiRenderBody(); aiCheck();
   if (prompt) { $("ai-in").value = prompt; }
@@ -2594,12 +2607,12 @@ function aiSteps() {
     else { const n = aiFileName((lang || "").toLowerCase(), code); st.push({ t: closed ? `Datei ${n} erstellt · ${lines} Zeilen` : `Schreibt Datei ${n} · ${lines} Zeilen …`, done: closed }); }
   }
   const last = parts.length % 4 === 1 ? parts[parts.length - 1] : "";
-  if (!/```[\w-]*\n?(?![\s\S]*```)/.test(aiStream)) st.push({ t: `Schreibt Antwort · ${words} ${words === 1 ? "Wort" : "Wörter"} …`, done: false, last });
+  if ((aiStream.match(/```/g) || []).length % 2 === 0) st.push({ t: `Schreibt Antwort · ${words} ${words === 1 ? "Wort" : "Wörter"} …`, done: false, last });
   return st;
 }
 const aiTime = () => { const sec = Math.max(0, Math.round((Date.now() - aiT0) / 1000)); return sec < 60 ? sec + " Sek." : Math.floor(sec / 60) + " Min. " + (sec % 60) + " Sek."; };
 const aiWorkText = () => aiTime();
-const aiWork = () => `<div class="ai-work" id="ai-work" style="--ph:-${(Date.now() % 1400) / 1000}s;--ph2:-${(Date.now() % 800) / 1000}s"><div class="ai-work-h"><span class="spark"></span><b>Arbeitet</b><span id="ai-work-t">${aiTime()}</span></div><ol>${aiSteps().map((x) => `<li class="${x.done ? "ok" : "run"}"><i></i>${esc(x.t)}</li>`).join("")}</ol></div>`;
+const aiWork = () => `<div class="ai-work" id="ai-work" style="--ph:-${(Date.now() % 1400) / 1000}s;--ph2:-${(Date.now() % 800) / 1000}s"><div class="ai-work-h">${ORI_SVG("flying mini")}<b>Origami arbeitet</b><span id="ai-work-t">${aiTime()}</span></div><ol>${aiSteps().map((x) => `<li class="${x.done ? "ok" : "run"}"><i></i>${esc(x.t)}</li>`).join("")}</ol></div>`;
 const aiWait = () => "";
 AI?.onChunk(({ reqId, text, phase }) => {
   if (reqId !== aiReq || !aiBusy) return;
