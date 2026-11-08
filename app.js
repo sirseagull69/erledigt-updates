@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.0 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.1 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1321,6 +1321,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.1": ["Dschungel: Fluss und überwachsener Tempel, weniger Papageien", "Unterwasser ohne Lichtstrahlen"],
   "2.8.0": ["Einkaufen wie bei Bring: Kacheln, Katalog nach Regalen, Zuletzt gekauft – Tipp aufs Kästchen = gekauft", "Oben „Milch, Brot, Eier“ eintippen legt gleich drei Artikel an", "Neue Landschaften: Unterwasser und Dschungel"],
   "2.7.5": ["Feiertage in der Landschaft: Advent, Weihnachten, Silvester-Feuerwerk, Ostern, Halloween – automatisch am richtigen Tag", "Ausprobieren: Einstellungen → Himmel testen → Anlass"],
   "2.7.4": ["Im dunklen Modus reicht die Landschaft bis hinter die Listen – weniger leere Fläche", "Kein Hinweis-Fenster mehr beim Wechsel zwischen Arbeit und Privat", "Handy: gleiche Oberfläche wie am PC"],
@@ -3315,9 +3316,15 @@ function buildJungle(defs) {
   jl(ridgeD(ridgePts(7, 96, 34, 1, false).map(([x, y]) => [x, y + 10 * Math.max(0, Math.sin(x / 110 + 1))])), .12, 0);
   jl(ridgeD(ridgePts(11, 118, 36, 1, false).map(([x, y]) => [x, y + 12 * Math.max(0, Math.sin(x / 70))])), .24, 0); fogBand(126, R);
   // Kronendach in drei Stufen: dichte Kronen auf der Kammlinie, ein paar Palmen und Riesen, die rausragen
+  const RX = SW * .56, TX = SW * .28; // Fluss vorne, Ruine hinten
   [[23, 142, 10, 7, .55, 2, 1, .4], [37, 164, 9, 9, .6, 3, 1, .58], [51, SH > 210 ? 222 : 190, 8, 12, .65, 3, 2, .78]].forEach(([seed, base, amp, size, dens, palms, giants, k], i) => {
-    const pts = ridgePts(seed, base, amp, .6, false); let d = ridgeD(pts);
-    for (let x = -10; x < SW + 10; x += size * .9) { if (R() < dens) { const q = near(pts, x); d += crown(x, q[1], size * (.6 + R() * .6)); } }
+    const pts = ridgePts(seed, base, amp, .6, false);
+    if (i === 2) { pts.forEach((q) => { if (Math.abs(q[0] - RX) < 90) q[1] += 14 * Math.cos((q[0] - RX) / 90 * Math.PI / 2); }); // Senke: hier liegt der Fluss
+      mk("ellipse", { cx: RX, cy: base + 10, rx: 92, ry: 8, fill: "url(#sc-lake)" });
+      L.shimmer = mk("g", {}, mv); for (let j = 0; j < 9; j++) mk("path", { d: `M${f1(RX - 70 + R() * 130)} ${f1(base + 6 + R() * 8)} h${f1(5 + R() * 9)}`, stroke: "#fff", "stroke-width": .7, "stroke-linecap": "round", class: "shim", style: `animation-delay:${R() * 3}s` }, L.shimmer); }
+    let d = ridgeD(pts);
+    for (let x = -10; x < SW + 10; x += size * .9) { if (i === 2 && Math.abs(x - RX) < 80) continue; if (R() < dens) { const q = near(pts, x); d += crown(x, q[1], size * (.6 + R() * .6)); } }
+    if (i === 1) { const q = near(pts, TX), x = q[0], y = q[1] + 2; d += ` M${f1(x - 30)} ${y + 4} L${f1(x - 30)} ${y - 6} L${f1(x - 22)} ${y - 6} L${f1(x - 22)} ${y - 14} L${f1(x - 14)} ${y - 14} L${f1(x - 14)} ${y - 22} L${f1(x - 6)} ${y - 22} L${f1(x - 6)} ${y - 30} L${f1(x + 6)} ${y - 30} L${f1(x + 6)} ${y - 22} L${f1(x + 14)} ${y - 22} L${f1(x + 14)} ${y - 14} L${f1(x + 22)} ${y - 14} L${f1(x + 22)} ${y - 6} L${f1(x + 30)} ${y - 6} L${f1(x + 30)} ${y + 4}Z M${f1(x - 3)} ${y - 30} L${f1(x - 3)} ${y - 36} L${f1(x + 3)} ${y - 36} L${f1(x + 3)} ${y - 30}Z`; } // Stufentempel, längst überwachsen
     for (let n = 0; n < palms; n++) { const q = near(pts, 30 + R() * (SW - 60)); d += palm(q[0], q[1], size * (2 + R() * .8), (R() - .5) * size * .8); }
     for (let n = 0; n < giants; n++) { const q = near(pts, 40 + R() * (SW - 80)); d += giant(q[0], q[1], size * (3.4 + R() * 1.2)); }
     jl(d, k, i + 1);
@@ -3350,9 +3357,7 @@ function buildWater() {
   // Hinten: ferne Riffkanten (blau verschwommen)
   const far = floor(11, FL - 78, 22); wl(ridgeD(far), .18);
   let d = ""; for (let i = 0; i < Math.ceil(SW / 100); i++) { const q = far[Math.floor(R() * far.length)]; d += R() < .5 ? staghorn(q[0], q[1] + 2, 9 + R() * 8, (R() - .5) * .6, 1.2) : brain(q[0], q[1] + 2, 6 + R() * 6); } wl(d, .28, "#5A8FB8");
-  // Lichtstrahlen (schwanken), zwischen fernem und mittlerem Riff; draw() schiebt sie mit der Sonne
   L.shafts = mk("g", { opacity: 0 });
-  [[-150, 40, 18], [-70, 70, 26], [20, 54, 22], [110, 76, 30], [200, 46, 18], [-230, 36, 14]].forEach(([x, w, deg], i) => { const p = mk("path", { d: `M${x - w * .2} -20 L${x + w * .2} -20 L${x + w + deg * 4} ${SH + 20} L${x - w + deg * 4} ${SH + 20}Z`, fill: "url(#sc-wray)" }, L.shafts); sway(p, x, -20, 1.6, 9000 + i * 1700); });
   // Mitte: Riff mit Korallen in Farbe
   const mid = floor(23, FL - 44, 16); wl(ridgeD(mid), .5);
   const byTint = {};
@@ -3713,7 +3718,7 @@ const EV = {
     }
   },
 };
-function randomEvent() { const nat = TH === "wald" || TH === "alpen", F = fest(); const pool = TH === "dschungel" ? (isNight() ? ["gluehwuermchen", "gluehwuermchen", "star", "sat"] : ["papagei", "schmetterling", "birds", "birds", "plane"]) : TH === "wasser" ? (isNight() ? ["quallen", "quallen", "fische", "hai"] : ["fische", "fische", "fische", "schildkroete", "hai", "quallen"]) : isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : []), ...(F.halloween ? ["fledermaus", "fledermaus", "fledermaus"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : []), ...(F.ostern && nat ? ["hase", "hase", "hase"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
+function randomEvent() { const nat = TH === "wald" || TH === "alpen", F = fest(); const pool = TH === "dschungel" ? (isNight() ? ["gluehwuermchen", "gluehwuermchen", "star", "sat"] : ["schmetterling", "birds", "birds", "plane", "papagei"]) : TH === "wasser" ? (isNight() ? ["quallen", "quallen", "fische", "hai"] : ["fische", "fische", "fische", "schildkroete", "hai", "quallen"]) : isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : []), ...(F.halloween ? ["fledermaus", "fledermaus", "fledermaus"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : []), ...(F.ostern && nat ? ["hase", "hase", "hase"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
 
 
 // ---------- Wetter (Open-Meteo, kein Konto, nur fester Ort Nufringen) ----------
@@ -3883,7 +3888,7 @@ sceneSync = () => {
   nextEvent();
   leafT = setInterval(() => { if (on && !quiet() && SEASON[season].leaves && Math.random() < .35) EV.leaf(); }, 60000);
   clearInterval(fwT); fwT = setInterval(() => { if (on && !quiet() && fest().feuerwerk && isNight() && Math.random() < .7) EV.feuerwerk(); }, 2600);
-  setTimeout(() => { if (on && !quiet()) fire(TH === "wasser" ? "fische" : TH === "dschungel" ? (isNight() ? "gluehwuermchen" : "papagei") : isNight() ? "star" : "plane"); }, 4000);
+  setTimeout(() => { if (on && !quiet()) fire(TH === "wasser" ? "fische" : TH === "dschungel" ? (isNight() ? "gluehwuermchen" : "birds") : isNight() ? "star" : "plane"); }, 4000);
 };
 // Test-Werkzeuge fürs Design-Menü
 const skyTest = {
