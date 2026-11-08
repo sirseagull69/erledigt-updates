@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.2 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.3 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1331,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.3": ["Assistent sieht jetzt nach was aus: Orb, Glanz, sanfte Animationen"],
   "2.8.2": ["Neue Landschaft Fjord – nachts mit Nordlicht, das sich im Wasser spiegelt", "Einkaufen aufgeräumt: Korb, „Schnell rein“, Regale nur auf Tipp", "Dschungel ist raus"],
   "2.8.1": ["Dschungel: Fluss und überwachsener Tempel, weniger Papageien", "Unterwasser ohne Lichtstrahlen"],
   "2.8.0": ["Einkaufen wie bei Bring: Kacheln, Katalog nach Regalen, Zuletzt gekauft – Tipp aufs Kästchen = gekauft", "Oben „Milch, Brot, Eier“ eintippen legt gleich drei Artikel an", "Neue Landschaften: Unterwasser und Dschungel"],
@@ -2354,7 +2355,9 @@ function aiApply(a, ids, ctx) {
 // ---- Oberfläche ----
 function aiShell() {
   $("ai").innerHTML = `
+    <div class="ai-glow" aria-hidden="true"></div>
     <div class="ai-head">
+      <span class="ai-orb" id="ai-orb" aria-hidden="true"></span>
       <div class="t"><b>Assistent</b><small id="ai-state"><i></i>prüfe …</small></div>
       <select id="ai-model" aria-label="Modell" hidden></select>
       <button type="button" id="ai-new" title="Neuer Chat">Neu</button>
@@ -2464,6 +2467,7 @@ function aiMsgHtml(m, i) {
   }).join("")}<div class="tools"><button type="button" data-copy>Kopieren</button>${/^\s*Betreff:/im.test(text) ? '<button type="button" data-mail>Als Mail öffnen</button>' : ""}</div></div>`;
 }
 function aiRenderBody() {
+  $("ai")?.classList.toggle("busy", aiBusy);
   const b = $("ai-body"); if (!b) return;
   aiRenderHead(); aiChips();
   if (aiStatus === "unknown") { b.innerHTML = '<div class="ai-empty">Suche die lokale KI …</div>'; return; }
@@ -2484,7 +2488,7 @@ function aiRenderBody() {
   }
   const msgs = aiMsgs.map(aiMsgHtml).join("");
   const streaming = aiBusy ? `<div class="ai-msg bot" id="ai-live">${aiStream ? aiMd(aiParse(aiStream).text) : aiWait()}</div>` : "";
-  b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty"><b>Was kann ich abnehmen?</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Texte und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
+  b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty"><span class="ai-orb big" aria-hidden="true"></span><b>Was kann ich abnehmen?</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Texte und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
   b.scrollTop = b.scrollHeight;
 }
 async function aiCheck() {
