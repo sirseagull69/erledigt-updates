@@ -41,5 +41,16 @@ body.web { touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   body.web .task.sw-r { box-shadow: -400px 0 0 0 #16A34A inset; }
   body.web .task.sw-l { box-shadow: 400px 0 0 0 #DC2626 inset; }
 }
+/* Handy: Details deckend (Glas ließ Knöpfe/Meldungen durchscheinen), Meldung über der Fußleiste, „Wie gelöst?“ weg solange Details offen */
+@media (hover: none) {
+  body.web .drawer { background: var(--card) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  body.web:has(.drawer:not([hidden])) .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 60; }
+  body.web:has(.drawer:not([hidden])) .solve { display: none; }
+  /* Tippflächen mindestens 44 px */
+  body.web .mode-seg button, body.web #logout, body.web .prios button, body.web .drawer .x, body.web .solve-row button,
+  body.web #inbox-read, body.web #inbox-clear, body.web .view-seg button, body.web .wk-nav button, body.web .mo-nav button { min-height: 44px !important; }
+  body.web .drawer .x { min-width: 44px; }
+  body.web .solve-never { padding: 10px 0; }
+}
 /* Android-App mit Handy-KI: ✦-Knopf wieder zeigen */
 body.web.native-ai #ai-btn { display: grid !important; }

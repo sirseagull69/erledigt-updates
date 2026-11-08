@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.9 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.0 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -193,7 +193,11 @@ try { list = localStorage.getItem("todo-list") || "alle"; } catch {}
 if (!listById[list]) list = "alle";
 
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Hintergrund-Timer nur arbeiten lassen, wenn das Fenster sichtbar ist (spart Akku/CPU); beim Zurückkommen einmal nachziehen
+const VIS_FNS = new Set();
+const whenVisible = (fn) => { VIS_FNS.add(fn); return () => { if (!document.hidden) fn(); }; };
+document.addEventListener("visibilitychange", () => { if (!document.hidden) VIS_FNS.forEach((f) => { try { f(); } catch {} }); });
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 // Alte Einträge (prio als true/false) weiter lesen können
 const norm = (d) => ({ ...d, archived: !!d.archived, checklist: Array.isArray(d.checklist) ? d.checklist : [], attachments: Array.isArray(d.attachments) ? d.attachments : [], notes: d.notes || "", prio: d.prio === true ? "hoch" : PRIO_RANK[d.prio] !== undefined ? d.prio : "mittel", list: listById[d.list] && d.list !== "alle" ? d.list : "arbeit" });
 
@@ -232,8 +236,7 @@ const endDay = (t) => t.until || t.due; // letzter Tag eines (mehrtägigen) Eint
 function remove(ids, text) {
   const gone = items.filter((i) => ids.includes(i.id));
   if (!gone.length) return;
-  undo = gone.map(({ id, ...body }) => ({ id, body }));
-  showToast(text);
+  showToast(text, gone.map(({ id, ...body }) => ({ id, body })));
   const order = visible().map((i) => i.id); const idx = order.indexOf(selected);
   if (ids.includes(selected)) selected = order.filter((x) => !ids.includes(x))[Math.max(0, idx - 1)] || null;
   for (const id of ids) write(() => col.doc(id).delete());
@@ -262,18 +265,22 @@ function cyclePrio(id) {
 }
 
 let toastTimer;
-function showToast(text) {
+// Rückgängig gibt es nur, wenn diese Meldung auch etwas zum Zurücknehmen hat (Liste gelöschter Einträge oder eine Funktion)
+function showToast(text, undoWith = null) {
+  undo = undoWith; $("toast-undo").hidden = !undoWith;
   $("toast-text").textContent = text; $("toast").hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").hidden = true; undo = null; }, 6000);
 }
 $("toast-undo").addEventListener("click", () => {
   if (!undo) return;
   const back = undo; undo = null; $("toast").hidden = true;
+  if (typeof back === "function") { back(); render(); return; }
   for (const { id, body, unarchive } of back) unarchive ? patch(id, { archived: false }) : write(() => col.doc(id).set(body));
 });
 
 // ---------- Ansicht ----------
-const inList = () => items.filter((t) => !t.archived && (list === "alle" || t.list === list));
+// „Alle“ im Arbeitsmodus ohne Einkaufszettel – Milch & Brot gehören nicht zwischen die Arbeitsaufgaben
+const inList = () => items.filter((t) => !t.archived && (list === "alle" ? !(t.list === "einkaufen" && !privMode()) : t.list === list));
 // Abschnitte der offenen Liste: Überfällig / Heute / Morgen / Diese Woche / Später / Ohne Datum
 const SECTIONS = ["Überfällig", "Heute", "Morgen", "Nächste 7 Tage", "Später", "Ohne Datum"];
 function sectionOf(t) {
@@ -675,7 +682,7 @@ $("bell").addEventListener("click", async () => {
     if ("Notification" in window && Notification.permission !== "granted") {
       try { await Notification.requestPermission(); } catch {}
     }
-    if (!canNotify()) showToast("Windows-Benachrichtigungen gehen hier nicht – Erinnerungen kommen nur in der Seite.");
+    if (!canNotify()) showToast(`${window.desktop ? "Windows-Benachrichtigungen" : "Mitteilungen"} gehen hier nicht – Erinnerungen kommen nur in der App.`);
     else { $("bell").classList.remove("ringing"); void $("bell").offsetWidth; $("bell").classList.add("ringing"); }
   }
   try { localStorage.setItem("todo-notify", wantNotify ? "1" : "0"); } catch {}
@@ -749,7 +756,7 @@ let design = null; // wird im Design-Teil weiter unten gesetzt
 
 // ---------- Laden ----------
 render(); updateHint();
-setInterval(render, 5 * 60000); // Begrüßung/Datum aktuell halten
+setInterval(whenVisible(render), 5 * 60000); // Begrüßung/Datum aktuell halten
 
 // ===== 02-spass-memes.js =====
 // ======================================================================
@@ -1057,7 +1064,7 @@ $("aside").addEventListener("click", (e) => {
 });
 matchMedia("(min-width: 1500px)").addEventListener("change", renderDay);
 renderDay();
-setInterval(renderDay, 30000);
+setInterval(whenVisible(renderDay), 30000);
 
 // ===== 03-fokus-rituale.js =====
 // ======================================================================
@@ -1276,8 +1283,8 @@ function shopHtml() {
   h += `<section class="sh-sec sh-korb"><h4><span>Im Korb</span><b>${open.length}</b>${open.length > 1 ? `<button type="button" class="sh-all" data-sh-all="1">Alles gekauft</button>` : ""}</h4>`;
   h += open.length ? `<div class="sh-grid">${open.map(tile).join("")}</div>` : `<div class="sh-empty">Leer. Tipp unten etwas an oder schreib oben <code>Milch, Brot, Eier</code>.</div>`;
   h += `</section>`;
-  if (sugg.length && !q) h += `<section class="sh-sec"><h4><span>Schnell rein</span></h4><div class="sh-grid sh-small">${sugg.map((x) => ktile(x)).join("")}</div></section>`;
-  h += `<section class="sh-sec sh-kat"><h4><span>Katalog</span><input type="search" class="sh-search" placeholder="Suchen …" value="${esc(shopQuery)}" aria-label="Im Katalog suchen"></h4>`;
+  if (sugg.length) h += `<section class="sh-sec sh-quick"${q ? " hidden" : ""}><h4><span>Schnell rein</span></h4><div class="sh-grid sh-small">${sugg.map((x) => ktile(x)).join("")}</div></section>`;
+  h += `<section class="sh-sec sh-kat"><h4><span>Katalog</span><input type="search" class="sh-search" placeholder="Suchen …" value="${esc(shopQuery)}" aria-label="Im Katalog suchen"></h4><div class="sh-res">`;
   if (q) {
     const hits = SHOP_ITEMS.filter((x) => x.name.toLowerCase().includes(q)).slice(0, 24);
     h += `<div class="sh-grid sh-small">${hits.map((x) => ktile(x)).join("")}${hits.some((x) => x.name.toLowerCase() === q) ? "" : ktile({ name: shopQuery.trim(), emoji: "➕" }, " sh-new")}</div>`;
@@ -1285,7 +1292,7 @@ function shopHtml() {
     h += `<div class="sh-chips">${SHOP_CATS.map(([c]) => `<button type="button" class="chip-btn${shopCat === c ? " on" : ""}" data-sh-cat="${esc(c)}">${esc(c)}</button>`).join("")}</div>`;
     if (shopCat) h += `<div class="sh-grid sh-small">${SHOP_ITEMS.filter((x) => x.cat === shopCat).map((x) => ktile(x)).join("")}</div>`;
   }
-  h += `</section></div>`;
+  h += `</div></section></div>`;
   return h;
 }
 const SHOP_STAPLES = ["Milch", "Brot", "Eier", "Butter", "Käse", "Bananen", "Äpfel", "Tomaten", "Nudeln", "Toilettenpapier", "Joghurt", "Kaffee"];
@@ -1298,12 +1305,12 @@ function shopAdd(name) {
 }
 $("tasks").addEventListener("click", async (e) => {
   if (list !== "einkaufen") return;
-  const all = e.target.closest("[data-sh-all]"); if (all) { const ids = shopItems().filter((t) => !t.done).map((t) => t.id); burst(all, 24, 1.6); sfx.done(); for (const id of ids) toggleDone(id); render(); return; }
+  const all = e.target.closest("[data-sh-all]"); if (all) { const ids = shopItems().filter((t) => !t.done).map((t) => t.id); burst(all, 24, 1.6); sfx.done(); for (const id of ids) toggleDone(id); render(); showToast(`${ids.length} Sachen gekauft`, () => ids.forEach((x) => items.find((i) => i.id === x)?.done && toggleDone(x))); return; }
   const cat = e.target.closest("[data-sh-cat]"); if (cat) { shopCat = shopCat === cat.dataset.shCat ? "" : cat.dataset.shCat; render(); return; }
   const add = e.target.closest("[data-sh-add]"); if (add) { shopAdd(add.dataset.shAdd); render(); const s = $("tasks").querySelector(".sh-search"); if (s && shopQuery) { shopQuery = ""; render(); } return; }
   const b = e.target.closest("[data-sh]"); if (!b) return;
   const id = b.dataset.sh, t = items.find((x) => x.id === id); if (!t) return;
-  if (!t.done) { b.classList.add("popping"); sfx.done(); burst(b, 14, 1.2); await wait(260); toggleDone(id); render(); }
+  if (!t.done) { b.classList.add("popping"); sfx.done(); burst(b, 14, 1.2); await wait(260); toggleDone(id); render(); showToast(`„${t.title}“ gekauft`, () => items.find((i) => i.id === id)?.done && toggleDone(id)); }
   else { // zuletzt gekauft → wieder in den Korb (neuer Eintrag, der alte bleibt für die Statistik)
     const k = shopKey(t.title); if (shopItems().some((x) => !x.done && shopKey(x.title) === k)) { showToast(`„${t.title}“ ist schon im Korb`); return; }
     addItem({ title: t.title, list: "einkaufen", prio: "mittel", notes: t.notes || "" }); render();
@@ -1315,7 +1322,16 @@ $("tasks").addEventListener("contextmenu", (e) => { const b = e.target.closest("
   ["touchend", "touchmove", "touchcancel"].forEach((ev) => $("tasks").addEventListener(ev, () => clearTimeout(pressT), { passive: true }));
   $("tasks").addEventListener("click", (e) => { const b = e.target.closest("[data-sh]"); if (b?.dataset.held) { delete b.dataset.held; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
 }
-$("tasks").addEventListener("input", (e) => { if (!e.target.classList.contains("sh-search")) return; shopQuery = e.target.value; const pos = e.target.selectionStart; render(); const s = $("tasks").querySelector(".sh-search"); if (s) { s.focus(); try { s.setSelectionRange(pos, pos); } catch {} } });
+// Suche tauscht nur die Trefferliste aus – kein komplettes Neuzeichnen pro Tastendruck, Fokus bleibt im Feld
+$("tasks").addEventListener("input", (e) => {
+  if (!e.target.classList.contains("sh-search")) return;
+  shopQuery = e.target.value;
+  const cur = e.target.closest(".shop"), tpl = document.createElement("template"); tpl.innerHTML = shopHtml();
+  const fresh = tpl.content.querySelector(".sh-res"), old = cur?.querySelector(".sh-res");
+  if (!old || !fresh) { render(); return; }
+  old.replaceWith(fresh);
+  const qk = cur.querySelector(".sh-quick"); if (qk) qk.hidden = !!shopQuery.trim();
+});
 $("tasks").addEventListener("keydown", (e) => { if (e.target.classList.contains("sh-search") && e.key === "Enter" && shopQuery.trim()) { e.preventDefault(); const hit = SHOP_ITEMS.find((x) => x.name.toLowerCase() === shopQuery.trim().toLowerCase()) || SHOP_ITEMS.find((x) => x.name.toLowerCase().startsWith(shopQuery.trim().toLowerCase())); shopAdd(hit ? hit.name : shopQuery.trim()); shopQuery = ""; render(); $("tasks").querySelector(".sh-search")?.focus(); } });
 // Eingabe oben: mehrere Artikel mit Komma
 $("addform").addEventListener("submit", (e) => {
@@ -1331,6 +1347,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.9.0": ["Großer Frühjahrsputz: schneller, sparsamer im Hintergrund, aufgeräumter Code", "Origami ist schlauer – mehr Gedächtnis, kürzere und passendere Anweisungen", "Handy: Listen als Pillen oben, Aufgaben sofort sichtbar, größere Tippflächen", "Fokus-Modus zeigt wieder Timer und Knöpfe", "Einkaufen: „gekauft“ lässt sich rückgängig machen", "Sicherheit: Assistenten-Links von außen werden ignoriert"],
   "2.8.9": ["Dein Assistent heißt jetzt Origami – mit eigenem Papiervogel, der beim Arbeiten fliegt"],
   "2.8.8": ["KI-Leistung jetzt in drei Stufen", "Beim Antworten siehst du Schritt für Schritt, was der Assistent gerade macht"],
   "2.8.7": ["Assistent im eigenen Look", "Lade-Kreis beim Schreiben repariert", "Android: Handy-KI mit Gemini Nano (neue App-Version installieren)"],
@@ -1355,55 +1372,6 @@ const CHANGELOG = {
   "2.6.2": ["Einstellungen auf allen Geräten gleich: Farbe, Landschaft, Hell/Dunkel, Arbeitszeit, Wetter-Ort (Arbeit/Privat bleibt je Gerät)", "Aufgabenzeilen wie am Handy: Kreis in Listenfarbe, „Hoch“ als roter Punkt"],
   "2.6.1": ["Himmel geht nahtlos bis an den oberen Fensterrand (Titelleiste durchsichtig)", "Updates deutlich sichtbar: Ladebalken unten rechts, Installations-Bildschirm, unter Windows mit Fortschrittsfenster", "Mitteilungen-Fenster wird nicht mehr von der Heute-Spalte verdeckt"],
   "2.6.0": ["Aufgeräumt: nur noch ein Look, Himmel fest oben, Seitenleiste nur Modus + Listen", "Design-Menü kurz: Modus, Hell/Dunkel, Farbe, Landschaft, Arbeitszeit", "Level, XP, Streak und Fortschritt gesammelt im Fenster „Erfolge“", "Aufgaben ruhiger: Nebensachen erst beim Hinzeigen; Offen/Erledigt-Schalter weg (Erledigtes von heute eingeklappt unten)", "Memes, Sprüche und Fokus-Modus entfernt"],
-  "2.5.4": ["Ziehen im Kalender und in der Woche funktioniert wieder zuverlässig", "Wetter in kleineren Fenstern dezent oben im Himmel, 7 Tage per Klick"],
-  "2.5.3": ["Kalender-Knopf oben rechts wie in der Handy-App", "Monatskalender im neuen Look ohne Kästen", "Wetter auch in kleineren Fenstern (z. B. MacBook): als Leiste über der Liste"],
-  "2.5.2": ["Alpen sehen jetzt wirklich nach Alpen aus: schroffe Felsgipfel mit Schnee, Almhütte, Seilbahn, türkiser Bergsee"],
-  "2.5.1": ["Updates klappen wieder, auch wenn Windows das alte Deinstallationsprogramm blockiert", "Neue Landschaften im Design-Menü: Alpen, Küste mit Leuchtturm, Stadt mit Lichtern, Schlicht"],
-  "2.5.0": ["Neuer Look wie die Handy-App: Himmel randlos oben, Aufgaben als Zeilen, weniger Kästen – im Design-Menü abschaltbar", "Wetter für 7 Tage in der rechten Spalte", "Sonne läuft nach echtem Sonnenauf- und -untergang, in Arbeit und Privat gleich"],
-  "2.4.2": ["Uhrzeit-Spannen werden erkannt: „Seminar 9-17 Uhr“, „9:30–12 Uhr“ – auch nachträglich in alten Einträgen", "Termine in der Liste „Arbeit“ mit Uhrzeit von–bis überschreiben an diesen Tagen deine Arbeitszeit (Feierabend-Countdown, Sonne)"],
-  "2.4.1": ["Kalender: Feiertage (je Bundesland, Standard Baden-Württemberg) wie Wochenenden hinterlegt, dazu Sondertage wie Heiligabend, Silvester, Muttertag, Advent, Zeitumstellung – auch in der Woche", "Bundesland in der Einrichtung einstellbar", "Speichern in Haushalt, Einkaufen und Termine klappt wieder", "Zeiträume werden erkannt: „Seminar 23.11.26-25.11.26“, „Urlaub vom 2.12. bis 6.12.“, „Messe 23.-25.11.“ – im Kalender an jedem Tag, verschieben schiebt alles mit", "Auch alte Einträge mit Datum im Titel bekommen ihr Datum jetzt nachträglich", "Enddatum auch von Hand: beim Datum „bis“ wählen"],
-  "2.4.0": ["Neu: Kalender – Ansicht „Monat“ neben Liste und Woche. Auf einen Tag klicken, Termin mit Uhrzeit eintragen; Einträge auf andere Tage ziehen; Monate blättern", "Umschalter Arbeit/Privat jetzt direkt oben in der Seitenleiste", "Arbeitszeit im Design-Menü unter „Nutzung“ – auch nach „Ich arbeite nicht“ kommst du so zurück"],
-  "2.3.10": ["Arbeitszeit steht jetzt direkt im Design-Menü unter „Nutzung“ – auch nach „Ich arbeite nicht“ kommst du so wieder zurück"],
-  "2.3.9": ["Mac-Updater überarbeitet: lädt jetzt über das Browser-Netzwerk, zeigt unten links jeden Schritt (Suche, Prozent, Installieren) und meldet Fehler mit Grund in den Mitteilungen", "Klappt der Austausch nicht, kein Endlos-Versuch mehr – stattdessen Download-Link"],
-  "2.3.8": ["Neu: Privat-Modus (Design-Menü → Nutzung): Listen Privat, Haushalt, Einkaufen, Termine, Alltagssprüche, eigene Vorlagen (Wocheneinkauf, Putzen, Urlaub packen, Geburtstag), keine Mail-Funktionen", "Einrichtung: Vorname, Arbeitszeit von–bis (oder „Ich arbeite nicht“) und Wetter-Ort für den Himmel", "Im Privat-Modus läuft die Sonne vom echten Sonnenaufgang bis zum Sonnenuntergang", "Feierabend-Knopf: Arbeitsbeginn und Ende einstellbar"],
-  "2.3.7": ["Mac: Updates kommen jetzt automatisch – Erledigt lädt die neue Version selbst, tauscht sich aus und startet neu"],
-  "2.3.6": ["Erledigt gibt es jetzt auch für den Mac (Apple-Chip)", "Auf dem Mac: Dock-Symbol in Akzentfarbe, Ampel-Knöpfe in der eigenen Titelleiste, Update-Hinweis mit Download-Link"],
-  "2.3.5": ["Himmel ruhiger: Ereignisse nur noch alle 3–6 Minuten, Blätter seltener"],
-  "2.3.4": ["Design-Menü → „Himmel testen“: Wetter (Sonne, Wolken, Regen, Schnee, Gewitter, Nebel) und Jahreszeit durchschalten, Tag im Zeitraffer, Ereignis auslösen. „Echt“ stellt wieder aufs echte Wetter"],
-  "2.3.3": ["Flieger, Vögel, Reh und Blätter kommen jetzt auch, wenn Erledigt nur im Hintergrund offen ist (nicht minimiert)", "Ereignisse öfter: etwa alle 1–2,5 Minuten, beim Zurückwechseln gleich eins"],
-  "2.3.2": ["Himmel passt sich jetzt der Fensterbreite an: nichts wird mehr gestreckt oder abgeschnitten, mehr Himmel, weniger Gewusel", "Wald luftiger, feineres Korn, Banner etwas höher"],
-  "2.3.1": ["Blätter fallen jetzt echt: sie lösen sich aus den Baumkronen, flattern und drehen sich im Wind und landen am Boden"],
-  "2.3.0": ["Neu oben: Himmel über dem Schwarzwald – die Sonne geht zu Arbeitsbeginn auf und genau zu deiner Feierabend-Zeit hinter den Bergen unter", "Echtes Wetter aus Nufringen: Regen, Schnee, Wolken, Nebel, Gewitter", "Echte Jahreszeit und Mondphase, abends gehen im Tal die Lichter an", "Ab und zu fliegt ein Flieger vorbei, Vögel, ein Reh am See, nachts Sternschnuppen", "Abschaltbar im Design-Menü unter Widgets"],
-  "2.2.4": ["Spruch rutscht beim Anklicken nicht mehr als Kasten unter den Feierabend-Knopf"],
-  "2.2.3": ["Zurück zu einem Ring – im Uhr-Stil in deiner Akzentfarbe: Verlauf, Schatten am Ringende, Funken bei 100 %. Klick spielt die Animation nochmal ab"],
-  "2.2.2": ["Drei Aktivitätsringe wie auf der Uhr: Aufgaben, Fokus (Ziel 4 Runden), Streak (Ziel 5 Tage) – auf schwarzem Grund, mit Schatten am Ringende, Runden über 100 % und Funken, wenn sich ein Ring schließt", "Klick auf die Ringe spielt die Animation nochmal ab"],
-  "2.2.1": ["Fortschrittsring wie auf der Smartwatch: Farbverlauf, Leuchten, füllt sich mit Schwung, Zahl zählt mit, bei 100 % kurzer Glow"],
-  "2.2.0": ["Liste in Abschnitten: Überfällig, Heute, Morgen, Nächste 7 Tage, Später, Ohne Datum", "„Heute erledigt“ eingeklappt unter der Liste", "Tipp-Zeile unter dem Eingabefeld nur noch beim Tippen", "Aktive Liste und Priorität in Akzentfarbe statt grell weiß", "Heute-Karte: Fortschrittsring „2 von 5 heute geschafft“"],
-  "2.1.6": ["6 neue augenschonende Designs: Papier, Abendlicht, Nord, Salbei, Lavendel, Graphit – mit weicherem Kontrast in Hell und Dunkel"],
-  "2.1.5": ["Leistungs-Regler ruhiger: bei Volle Leistung wird die Leiste zur Platine, ein Stromimpuls läuft einmal durch die Leiterbahnen"],
-  "2.1.4": ["Eigene Titelleiste in Design-Farbe – im Darkmode kein weißer Balken mehr oben", "Leistungs-Regler: beim Hochschalten KI-Effekt (Aurora-Leuchten, Lichtstreif, schimmernder Text) statt Konfetti"],
-  "2.1.3": ["App-Symbol (Fenster, Taskleiste, Infobereich) passt sich jetzt der Design-Farbe an"],
-  "2.1.2": ["Assistent: Leistung jetzt als Schieberegler „Sparsam ↔ Volle Leistung“ – klicken oder ziehen"],
-  "2.1.1": ["KI-Sparmodus (Standard): nur 2 Rechenkerne, weniger Speicher, niedrige Priorität – dein PC bleibt flüssig. Umschalten oben im Assistenten (Sparsam/Schnell)"],
-  "2.1.0": ["Unter der Haube aufgeräumt: Code in übersichtliche Teile zerlegt, Altlasten raus – sonst ändert sich nichts"],
-  "2.0.5": ["Mail reinziehen geht wieder sichtbar: Fenster kommt nach vorn, Detail und Hinweise erscheinen sofort (2.0.4 hatte sie im Hintergrund angehalten)"],
-  "2.0.4": ["Braucht weniger Rechenleistung: Animationen laufen nur noch, wenn das Fenster aktiv ist, Dauer-Animationen (Frosch, Flamme, Freitag) hören nach ein paar Runden auf"],
-  "2.0.3": ["Bericht: KI sortiert nur noch nach Themen – die Aufgaben selbst kommen immer aus deiner Liste, nichts wird erfunden", "Assistent: Mail-Antworten kurz (2–4 Sätze), im Ton des Absenders (du/Sie), ohne Floskeln", "Assistent: deine Frage wird ohne den ganzen Kontext-Text angezeigt"],
-  "2.0.2": ["Mails: In der Cloud steht nur noch Absender + eine Zeile Kurzfassung, der volle Text bleibt lokal auf diesem PC („Ganze Mail anzeigen“ im Detail). Alte Mail-Aufgaben werden einmal automatisch aufgeräumt."],
-  "2.0.1": ["Konfetti: startet nie mehr aus der Ecke oben links (wenn der Knopf schon weg war), stapelt sich nicht mehr endlos", "Sprüche verschwinden beim Draufklicken nicht mehr"],
-  "2.0.0": ["Gedächtnis: Beim Abhaken fragt Erledigt kurz „Wie gelöst?“ – kommt später was Ähnliches, steht „Schon mal gelöst“ dran (auch im Detail, in der Suche und für den Assistenten)", "„Was hab ich gemacht?“ (Heute-Karte): Bericht für Heute/Woche/Monat, mit KI zusammenfassen, kopieren oder als Mail"],
-  "1.9.5": ["Mail-Vorschläge (Posteingang auslesen) wieder entfernt"],
-  "1.9.4": ["Mail-Aufgaben zeigen den Absender direkt an der Aufgabe", "Titel kommt aus dem Inhalt der Mail (macht die KI), nicht nur aus dem Betreff", "Neue Sprüche mit mehr Kick – Klick auf den Spruch zeigt den nächsten", "Fortschritt zeigt jetzt „1 erledigt · 2 offen“ statt „1 von 3“"],
-  "1.9.3": ["Autostart repariert sich selbst, falls der Eintrag auf eine alte Datei zeigt"],
-  "1.9.2": ["Mail → Aufgabe: Notiz enthält nur noch den Kern der Mail (ohne Anrede, Signatur, Disclaimer, alten Verlauf); „morgen“, „bis Freitag“, „bis 20.11.“ wird als Fälligkeit übernommen", "Beim Windows-Start öffnet sich das Fenster jetzt"],
-  "1.9.1": ["Beim Windows-Start öffnet sich das Fenster jetzt (vorher nur unten rechts im Infobereich)"],
-  "1.8.0": ["Mail → Aufgabe: Mail aus Outlook ins Fenster ziehen (oder kopieren + Strg+Alt+V / ins Eingabefeld einfügen) – Betreff wird Titel, Absender und Text landen in den Notizen", "Assistent bei Mail-Aufgaben: „Antwort schreiben“ und „Was will der von mir?“"],
-  "1.7.4": ["Konfetti fliegt jetzt immer vor allem – auch über Detail-Fenster, Assistent und Dialogen"],
-  "1.7.3": ["Assistent antwortet schneller: liest deine Aufgaben schon beim Öffnen ein", "Zeigt beim Warten, was er gerade macht", "Spart RAM: KI wird 1 Min nach dem Schließen des Assistenten (oder nach 5 Min ohne Frage) aus dem Speicher geworfen", "Assistent schreibt nur noch Mails, wenn du danach fragst – sonst beantwortet er einfach die Frage"],
-  "1.7.1": ["KI ist jetzt eingebaut – kein Ollama mehr nötig. Assistent öffnen (Strg+J) → Modell laden (einmalig ca. 2,5 GB) → fertig"],
-  "1.7.0": ["Assistent (Strg+J): lokale KI, kennt deine Aufgaben, schreibt Mails und Texte, legt Aufgaben an – kostenlos, bleibt auf dem PC", "„In Claude öffnen“ übergibt Frage samt Aufgaben an claude.ai", "Fragt von selbst nach bei Aufgaben, die ewig rumliegen oder überfällig sind (max. 2x am Tag)"],
-  "1.6.0": ["Unterpunkte, Notizen und Screenshots (Strg+V) pro Aufgabe – Titel anklicken", "Vorlagen: Austritt, Neuer Mitarbeiter, Neuer PC + eigene", "Suche über alles mit Strg+F", "Wochenansicht mit Drag & Drop", "Mini-Widget (Strg+Alt+W)", "Aufgabe aus Zwischenablage (Strg+Alt+V)"],
-  "1.5.0": ["Design-Menü (Paletten-Knopf): Farbschemas, eigene Farbe, Seitenleiste, Ecken, Dichte", "Bunte Widgets und Widgets ein-/ausblenden", "Geheimes Arcade-Design per Konami-Code", "Mitteilungs-Zentrale oben rechts"],
 };
 const INBOX_KEY = "erledigt-inbox";
 function notesGet() { return store.get(INBOX_KEY, []); }
@@ -1458,7 +1426,7 @@ $("inbox-list").addEventListener("click", (e) => {
   }
 });
 document.addEventListener("click", (e) => { if (!$("inbox").hidden && !e.target.closest("#inbox") && !e.target.closest("#inbox-btn")) closeInbox(); });
-setInterval(() => { if (!$("inbox").hidden) renderInbox(); }, 60000);
+setInterval(() => { if (!document.hidden && !$("inbox").hidden) renderInbox(); }, 60000);
 renderInboxBadge(false);
 
 // ======================================================================
@@ -1548,7 +1516,7 @@ function applyDesign() {
   b.toggle("arcade", !!p.force);
   b.toggle("soft", !!p.soft);
   if (sceneSync) sceneSync();
-  const ni = document.getElementById("new"); if (ni) ni.placeholder = design.mode === "privat" ? "Was steht an? z. B. „Zahnarzt anrufen morgen“" : "Was steht an? z. B. „VPN Peter prüfen morgen“";
+  const ni = document.getElementById("new"); if (ni) ni.placeholder = innerWidth < 520 ? (design.mode === "privat" ? "z. B. „Zahnarzt morgen 15 Uhr“" : "z. B. „VPN Peter morgen“") : design.mode === "privat" ? "Was steht an? z. B. „Zahnarzt anrufen morgen“" : "Was steht an? z. B. „VPN Peter prüfen morgen“";
 }
 
 function renderDesign() {
@@ -1564,7 +1532,7 @@ function renderDesign() {
   const cust = design.custom || (PRESETS[design.preset] || PRESETS.standard).a;
   $("design-body").innerHTML = `
     <section class="st-sec"><h3>Modus</h3>${opt("mode", [["arbeit", "Arbeit"], ["privat", "Privat"]])}</section>
-    <section class="st-sec"><h3>Hell oder Dunkel</h3>${opt("theme", [["system", window.desktop?.platform === "darwin" ? "Wie Mac" : "Wie Windows"], ["light", "Hell"], ["dark", "Dunkel"]], theme)}</section>
+    <section class="st-sec"><h3>Hell oder Dunkel</h3>${opt("theme", [["system", !window.desktop ? "Automatisch" : window.desktop.platform === "darwin" ? "Wie Mac" : "Wie Windows"], ["light", "Hell"], ["dark", "Dunkel"]], theme)}</section>
     <section class="st-sec"><h3>Farbe</h3><div class="st-tiles">${Object.entries(PRESETS).map(swatch).join("")}<label class="st-tile custom" aria-pressed="${!!design.custom}"><i style="--a:${design.custom || "#f43f5e"};--b:${design.custom || "#3b82f6"}"${design.custom ? "" : ' class="rainbow"'}></i><span>Eigene</span><input type="color" id="custom-color" value="${cust}"></label></div></section>
     <section class="st-sec"><h3>Landschaft</h3><div class="st-land" role="group">${[["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"], ["wasser", "Unterwasser"], ["fjord", "Fjord"]].map(([v, l]) => `<button type="button" data-opt="scene" data-val="${v}" aria-pressed="${design.scene === v}"><img src="img/land-${v}.jpg" alt="" loading="lazy"><span>${l}</span></button>`).join("")}</div></section>
     <section class="st-sec"><h3>Arbeitstag</h3><div class="st-list">
@@ -1954,7 +1922,7 @@ function weekHtml() {
   }).join("");
   const nodate = open.filter((t) => !t.due);
   const kw = (() => { const x = new Date(Date.UTC(mon.getFullYear(), mon.getMonth(), mon.getDate())); const day = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - day); const y = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return Math.ceil(((x - y) / 864e5 + 1) / 7); })();
-  return `<div class="wk-nav"><b>KW ${kw}</b><button type="button" data-wk="-1" aria-label="Vorige Woche">‹</button><button type="button" data-wk="0">Heute</button><button type="button" data-wk="1" aria-label="Nächste Woche">›</button><span style="color:var(--muted);font-size:13px;margin-left:8px">Karten auf einen Tag ziehen, um sie zu verschieben</span></div>
+  return `<div class="wk-nav"><b>KW ${kw}</b><button type="button" data-wk="-1" aria-label="Vorige Woche">‹</button><button type="button" data-wk="0">Heute</button><button type="button" data-wk="1" aria-label="Nächste Woche">›</button><span class="wk-hint" style="color:var(--muted);font-size:13px;margin-left:8px">Karten auf einen Tag ziehen, um sie zu verschieben</span></div>
     <div class="wk-nodate" data-day="none"><span class="lbl">Ohne Datum</span>${nodate.length ? nodate.map((t) => `<span class="wk-chip" draggable="true" data-id="${t.id}" style="--task-c:${listById[t.list].dot}">${esc(t.title)}</span>`).join("") : '<span style="color:var(--faint);font-size:13px;text-transform:none;letter-spacing:0">– hierher ziehen entfernt das Datum</span>'}</div>
     <div class="wk-grid">${cols}</div>`;
 }
@@ -2278,56 +2246,52 @@ function aiTaskLine(t, n) {
 }
 // Privat-Modus / anderer Name: Prompt umschreiben (kein IT-Support, kein Ritterwand)
 function userName() { try { return (design.name || "").trim() || "Nils"; } catch { return "Nils"; } }
-function aiSystem(open) {
-  let p = aiSystemWork(open);
+function aiSystem(open, q = "") {
+  let p = aiSystemWork(open, q);
   const n = userName();
   if (!privMode() && n === "Nils") return p;
   if (privMode()) {
     p = p.replace(/^Du bist Origami[^\n]*\n/, `Du bist Origami, der Assistent in „Erledigt“, der To-do-App von ${n}. Dein Name kommt vom gefalteten Papiervogel – du faltest große Aufgaben in kleine. ${n} nutzt die App privat: Haushalt, Einkaufen, Termine, Freizeit.\n`)
-      .replace(" Kollegen bei Ritterwand duzen sich meist. Sonst Sie.", " Sonst Sie.")
-      .replace(/Beispiel – Nils:[\s\S]*?mit diesen Punkten\.\n/, `Beispiel – ${n}: „Wie krieg ich die Wohnung bis Samstag sauber?“\nDu: „So würd ich's aufteilen:\n- Donnerstag: Bad und Küche\n- Freitag: Staubsaugen und Wischen\n- Samstag früh: Betten, Müll, kurz durchlüften“ und dazu ein Aktionsblock „unterpunkte“ mit diesen Punkten.\n`);
+      .replace("Kollegen bei Ritterwand duzen sich meist; sonst Sie.", "sonst Sie.")
+      .replace(/Beispiel – Nils:[^\n]*\n/, `Beispiel – ${n}: „Wie krieg ich die Wohnung bis Samstag sauber?“ – Du: kurze Liste (Do: Bad + Küche, Fr: Saugen + Wischen, Sa früh: Betten, Müll) und ein Aktionsblock „unterpunkte“.\n`);
   }
   return p.replace(/Nils/g, n);
 }
-function aiSystemWork(open) {
+// Systemanweisung: kurz halten (kleine Modelle werden mit langen Regelwerken dümmer) und nur die Regeln
+// mitschicken, die zur Frage passen – Mail-Regeln nur bei Mail-Fragen, Datei-Regeln nur bei Datei-Wünschen.
+function aiSystemWork(open, q = "") {
   const t = todayD();
-  const days = Array.from({ length: 8 }, (_, i) => { const d = addDays(t, i); return `${WD[d.getDay()]} ${iso(d)}`; }).join(", ");
+  const days = Array.from({ length: 8 }, (_, i) => { const d = addDays(t, i); return `${WD[d.getDay()].slice(0, 2)} ${iso(d)}`; }).join(", ");
   const doneToday = items.filter((x) => x.done && x.doneAt && iso(new Date(x.doneAt)) === iso(t)).length;
-  return `Du bist Origami, der Assistent in „Erledigt“, der To-do-App von Nils. Dein Name kommt vom gefalteten Papiervogel – du faltest große Aufgaben in kleine. Nils arbeitet im IT-Support bei Ritterwand.
-Heute ist ${WD[t.getDay()]}, ${iso(t)}. Die nächsten Tage: ${days}.
-Heute schon erledigt: ${doneToday}.
+  const ctxT = aiCtx && items.find((x) => x.id === aiCtx);
+  const wantsMail = /mail|antwort|antworte|schreib (ihm|ihr|dem|der)|AW:|betreff/i.test(q) || /^Mail von /.test(ctxT?.notes || "");
+  const wantsFile = /html|webseite|seite bau|datei|skript|script|tabelle|csv|markdown|\bmd\b|powershell|ps1|code|json|vorlage|checkliste als/i.test(q);
+  const lists = shownLists().filter((l) => l.id !== "alle").map((l) => l.id).join("|");
+  let p = `Du bist Origami, der Assistent in „Erledigt“, der To-do-App von Nils (IT-Support bei Ritterwand). Dein Name kommt vom Papiervogel – du faltest große Aufgaben in kleine Schritte.
+Heute: ${WD[t.getDay()]} ${iso(t)}. Nächste Tage: ${days}. Heute erledigt: ${doneToday}.
 
-Wer du bist:
-- Neugierig, warm und ehrlich. Du denkst mit wie ein guter Kollege, nicht wie ein Formular.
-- Du sagst klar, was du denkst – auch wenn's nicht das ist, was Nils hören will („Ehrlich: das schaffst du heute nicht alles. Schieb X.“).
-- Ein bisschen trockener Humor ist okay, wenn's passt; nie albern, keine Emojis-Flut (höchstens eins).
-- Du gibst zu, wenn du etwas nicht weißt, statt zu raten. Du erfindest keine Fakten.
-- Du fasst dich kurz. Lieber ein guter Satz als drei Absätze. Kein „Gerne!“, kein „Natürlich!“, kein „Ich hoffe, das hilft“.
-- Wenn Nils gestresst wirkt, nimm das kurz wahr und mach den nächsten Schritt kleiner.
-
-So antwortest du:
-1. Normal ist Chat: Beantworte genau die Frage, die Nils stellt – konkret und praktisch, auf Deutsch, locker, du-Form. KEINE Anrede, KEIN Gruß, KEINE Unterschrift.
-2. Eine Mail schreibst du NUR, wenn Nils ausdrücklich nach einer Mail oder Antwort fragt („schreib eine Mail“, „antworte ihm“). Dann: erste Zeile „Betreff: …“ (bei Antworten „AW: “ + alter Betreff), Leerzeile, Text, am Ende „Viele Grüße“ und darunter „Nils“.
- KURZ: 2 bis 4 Sätze. Keine Floskeln wie „vielen Dank für Ihre Nachricht“. Nichts versprechen oder behaupten, was Nils nicht gesagt hat – lieber offen lassen („passt dir morgen 10 Uhr?“).
- Ton wie der Absender: Duzt er Nils („Hallo Nils“) → du + „Hallo <Vorname>,“. Kollegen bei Ritterwand duzen sich meist. Sonst Sie.
-3. Wenn Nils eine Nachricht weiterleitet, die er bekommen hat, ist das Info für ihn – keine Mail an ihn. Schlag eine passende Aufgabe vor.
-4. Fehlt dir Wichtiges, stell höchstens zwei kurze Rückfragen.
-4b. Will Nils eine Datei (Webseite, HTML, Skript, Tabelle, Liste zum Speichern): schreib einen Satz davor, dann die KOMPLETTE Datei in EINEM Codeblock mit Sprache (\`\`\`html, \`\`\`md, \`\`\`csv, \`\`\`ps1 …), danach höchstens ein Satz. Die App zeigt den Block als Datei mit Vorschau und Speichern-Knopf. HTML immer vollständig mit <title> und eigenem <style>, ohne externe Links. Bei Dateien KEIN „Betreff:“ und kein Mail-Format.
-5. Aufgaben ändern kannst du nur mit einem Aktionsblock am Ende; Nils bestätigt ihn per Klick. Behaupte nie, du hättest etwas geändert oder ergänzt.
- Format (ein Block pro Aktion, nur Felder, die du weißt):
+Art: ehrlich, warm, kurz, mitdenkend wie ein guter Kollege. Sag klar, was du denkst – auch Unbequemes („Das schaffst du heute nicht alles, schieb X“). Trockener Humor erlaubt, höchstens ein Emoji. Keine Floskeln („Gerne!“, „Ich hoffe, das hilft“). Erfinde nichts; wenn du es nicht weißt, sag das.
+Antworte auf Deutsch, du-Form, ohne Gruß und ohne Unterschrift. Beantworte genau die Frage. Listen mit „- “. Fehlt Wichtiges: höchstens zwei kurze Rückfragen.
+`;
+  if (wantsMail) p += `
+MAIL (nur weil danach gefragt): erste Zeile „Betreff: …“ (Antwort: „AW: “ + alter Betreff), Leerzeile, 2–4 kurze Sätze, dann „Viele Grüße“ und „Nils“. Nichts versprechen, was Nils nicht gesagt hat. Duzt der Absender Nils → du + „Hallo <Vorname>,“; Kollegen bei Ritterwand duzen sich meist; sonst Sie. Eine weitergeleitete Nachricht an Nils ist Info für ihn – dann keine Mail, sondern eine passende Aufgabe vorschlagen.
+`;
+  else p += `Schreib KEINE Mail und kein „Betreff:“, außer Nils fragt ausdrücklich danach.
+`;
+  if (wantsFile) p += `
+DATEI: ein kurzer Satz, dann die KOMPLETTE Datei in EINEM Codeblock mit Sprache (\`\`\`html, \`\`\`md, \`\`\`csv, \`\`\`ps1 …), danach höchstens ein Satz. Die App zeigt den Block als Datei mit Vorschau. HTML: vollständig mit <title> und eigenem <style>, keine externen Links; Aufklapp-Elemente mit <details><summary>.
+`;
+  p += `
+AUFGABEN ÄNDERN geht nur per Aktionsblock am Ende – Nils bestätigt per Klick. Behaupte nie, du hättest etwas geändert. Ein Block pro Aktion, nur bekannte Felder:
 \`\`\`aktion
-{"typ":"neue_aufgabe","titel":"…","datum":"JJJJ-MM-TT","uhrzeit":"HH:MM","prio":"hoch|mittel|niedrig","liste":"${shownLists().filter((l) => l.id !== "alle").map((l) => l.id).join("|")}","unterpunkte":["…"]}
+{"typ":"neue_aufgabe","titel":"…","datum":"JJJJ-MM-TT","uhrzeit":"HH:MM","prio":"hoch|mittel|niedrig","liste":"${lists}","unterpunkte":["…"]}
 \`\`\`
- Weitere Typen: {"typ":"verschieben","nr":3,"datum":"JJJJ-MM-TT"} · {"typ":"erledigt","nr":3} · {"typ":"unterpunkte","nr":3,"punkte":["…","…"]} · {"typ":"notiz","nr":3,"text":"…"}
- „nr“ ist die Nummer aus der Liste unten – erfinde keine.
-
-Beispiel – Nils: „Wie teste ich am besten das WLAN in der Kantine?“
-Du: „So würd ich's machen:
-- Mit Handy/Laptop an mehreren Stellen (Tische, Ecken, Ausgabe) Speedtest machen
-- Prüfen, ob du beim Rumlaufen nicht rausfliegst (Roaming)
-- Gastnetz und Firmen-WLAN beide testen
-- Ergebnisse kurz notieren, dann hast du was für die Prüferin“ und dazu ein Aktionsblock „unterpunkte“ mit diesen Punkten.
-
+Weitere: {"typ":"verschieben","nr":3,"datum":"JJJJ-MM-TT"} · {"typ":"erledigt","nr":3} · {"typ":"unterpunkte","nr":3,"punkte":["…"]} · {"typ":"notiz","nr":3,"text":"…"}. „nr“ = Nummer aus der Liste unten, nie erfinden.
+`;
+  if (!wantsMail && !wantsFile) p += `
+Beispiel – Nils: „Wie teste ich das WLAN in der Kantine?“ – Du: kurze Liste mit 3–4 konkreten Schritten und darunter ein Aktionsblock „unterpunkte“ für die passende Aufgabe.
+`;
+  return p + `
 Offene Aufgaben:
 ${open.length ? open.map((x, i) => aiTaskLine(x, i + 1)).join("\n") : "(keine)"}`;
 }
@@ -2432,7 +2396,6 @@ function aiPreview(f) {
 // ---- Oberfläche ----
 function aiShell() {
   $("ai").innerHTML = `
-    <div class="ai-glow" aria-hidden="true"></div>
     <div class="ai-head">
       ${ORI_SVG("idle")}
       <div class="t"><b class="ori-name">Origami</b><small id="ai-state"><i></i>prüfe …</small></div>
@@ -2472,8 +2435,7 @@ function aiSetMode(m) {
   aiRenderPerf();
   const p = $("ai-perf"); if (p) { p.classList.remove("bump"); void p.offsetWidth; p.classList.add("bump"); }
 }
-function aiDrawCircuit() {}
-function aiSliderInit() {
+function aiSegInit() {
   const g = $("ai-seg"); if (!g) return;
   g.addEventListener("click", (e) => { const b = e.target.closest("button[data-mode]"); if (b) aiSetMode(b.dataset.mode); });
   g.addEventListener("keydown", (e) => {
@@ -2524,7 +2486,7 @@ function aiRenderBody() {
     return;
   }
   const msgs = aiMsgs.map(aiMsgHtml).join("");
-  const streaming = aiBusy ? `<div class="ai-msg bot" id="ai-live">${aiStream ? aiMd(aiParse(aiStream).text) : aiWait()}${aiWork()}</div>` : "";
+  const streaming = aiBusy ? `<div class="ai-msg bot" id="ai-live">${aiStream ? aiMd(aiParse(aiStream).text) : ""}${aiWork()}</div>` : "";
   b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty">${ORI_SVG("big idle")}<b>Hi, ich bin Origami.</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Dateien und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
   b.scrollTop = b.scrollHeight;
 }
@@ -2550,7 +2512,7 @@ function aiWarm() {
 function openAi(ctxId, prompt) {
   if (MINI) return;
   if (detailId) closeDetail();
-  if ($("ai").hidden) { $("ai").style.cssText = oriVars(oriPalette(getComputedStyle(document.documentElement).getPropertyValue("--accent"))); aiShell(); aiSliderInit(); $("ai").hidden = false; setTimeout(aiDrawCircuit, 30); $("ai-btn").classList.add("on"); }
+  if ($("ai").hidden) { $("ai").style.cssText = oriVars(oriPalette(getComputedStyle(document.documentElement).getPropertyValue("--accent"))); aiShell(); aiSegInit(); $("ai").hidden = false; $("ai-btn").classList.add("on"); }
   if (ctxId !== undefined) aiCtx = ctxId;
   aiRenderBody(); aiCheck();
   if (prompt) { $("ai-in").value = prompt; }
@@ -2574,10 +2536,14 @@ async function aiSend(raw) {
   aiMsgs.push({ role: "user", content: aiUserText(raw), show: raw, ctxTitle: ctxT ? ctxT.title : "", t: Date.now() });
   aiSave();
   aiBusy = true; aiStream = ""; aiPhase = ""; const req = ++aiReq;
-  aiT0 = Date.now(); aiSawLoad = false; aiNTasks = open.length; clearInterval(aiTick); aiTick = setInterval(() => { const t = $("ai-work-t"); if (t) t.textContent = aiWorkText(); }, 1000);
+  aiT0 = Date.now(); aiSawLoad = false; aiNTasks = open.length; clearInterval(aiTick); aiTick = setInterval(() => { const t = $("ai-work-t"); if (t) t.textContent = aiTime(); }, 1000);
   aiRenderBody();
-  const history = aiMsgs.filter((m) => !m.err).slice(-12).map((m) => ({ role: m.role, content: m.content }));
-  const r = await AI.chat(aiModel, [{ role: "system", content: aiSystem(open) }, ...history], req);
+  // Verlauf schlank halten: alte Dateien nur als Platzhalter, und nur so viel, wie in den Kontext passt
+  const budget = { spar: 5000, mittel: 11000, normal: 18000 }[aiMode] || 5000;
+  const all = aiMsgs.filter((m) => !m.err).map((m, i, arr) => ({ role: m.role, content: i < arr.length - 2 ? m.content.replace(/```([\w-]*)\n?([\s\S]*?)```/g, (x, l, c) => l === "aktion" ? "" : `[Datei ${aiFileName((l || "").toLowerCase(), c)} · ${c.split("\n").length} Zeilen]`) : m.content }));
+  const history = []; let used = 0;
+  for (let i = all.length - 1; i >= 0 && history.length < 12; i--) { used += all[i].content.length; if (used > budget && history.length) break; history.unshift(all[i]); }
+  const r = await AI.chat(aiModel, [{ role: "system", content: aiSystem(open, raw) }, ...history], req);
   if (req !== aiReq) return;
   aiBusy = false; clearInterval(aiTick);
   const text = (r.text || aiStream || "").trim();
@@ -2586,7 +2552,6 @@ async function aiSend(raw) {
   aiStream = ""; aiSave(); aiRenderBody();
   if (!r.ok) aiCheck();
 }
-const AI_PHASE = { load: "Lade das Modell in den Speicher … (nur beim ersten Mal nach dem Start)", read: "Liest deine Aufgaben und denkt nach …" };
 let aiPhase = "";
 let aiT0 = 0, aiTick = 0;
 // Was die KI gerade tut – als kleine Schrittliste (erledigt ✓ / läuft ◌), dazu die Zeit
@@ -2611,17 +2576,22 @@ function aiSteps() {
   return st;
 }
 const aiTime = () => { const sec = Math.max(0, Math.round((Date.now() - aiT0) / 1000)); return sec < 60 ? sec + " Sek." : Math.floor(sec / 60) + " Min. " + (sec % 60) + " Sek."; };
-const aiWorkText = () => aiTime();
 const aiWork = () => `<div class="ai-work" id="ai-work" style="--ph:-${(Date.now() % 1400) / 1000}s;--ph2:-${(Date.now() % 800) / 1000}s"><div class="ai-work-h">${ORI_SVG("flying mini")}<b>Origami arbeitet</b><span id="ai-work-t">${aiTime()}</span></div><ol>${aiSteps().map((x) => `<li class="${x.done ? "ok" : "run"}"><i></i>${esc(x.t)}</li>`).join("")}</ol></div>`;
-const aiWait = () => "";
 AI?.onChunk(({ reqId, text, phase }) => {
   if (reqId !== aiReq || !aiBusy) return;
   if (phase) aiPhase = phase; if (phase === "load") aiSawLoad = true;
   aiStream = text;
-  const el = $("ai-live"); if (!el) return;
-  el.innerHTML = (aiMd(aiParse(text).text) || aiWait()) + aiWork();
-  const b = $("ai-body"); b.scrollTop = b.scrollHeight;
+  // höchstens einmal pro Frame neu zeichnen; nur mitscrollen, wenn man unten ist (sonst kann man nicht zurücklesen)
+  if (aiFrame) return;
+  aiFrame = requestAnimationFrame(() => {
+    aiFrame = 0;
+    const el = $("ai-live"); if (!el || !aiBusy) return;
+    const b = $("ai-body"), stick = b.scrollHeight - b.scrollTop - b.clientHeight < 80;
+    el.innerHTML = aiMd(aiParse(aiStream).text) + aiWork();
+    if (stick) b.scrollTop = b.scrollHeight;
+  });
 });
+let aiFrame = 0;
 AI?.onPull((p) => {
   if (!aiPull) return;
   const pct = p.total ? Math.round((p.completed || 0) / p.total * 100) : aiPull.pct;
@@ -2946,7 +2916,7 @@ function askSolution(t) {
   $("solve-in").value = "";
   el.hidden = false;
   clearTimeout(solveTimer);
-  const arm = () => { clearTimeout(solveTimer); solveTimer = setTimeout(() => { if (document.activeElement !== $("solve-in") || !$("solve-in").value) el.hidden = true; }, 20000); };
+  const arm = () => { clearTimeout(solveTimer); solveTimer = setTimeout(() => { if (document.activeElement !== $("solve-in") || !$("solve-in").value) el.hidden = true; }, matchMedia("(hover: none)").matches ? 9000 : 20000); };
   arm(); el.onmousemove = arm;
 }
 function saveSolution() {
@@ -3953,8 +3923,8 @@ sceneSync = () => {
   loadWeather().then(refresh);
   tick = setInterval(() => { refresh(); if (new Date().getMinutes() % 30 === 0) loadWeather().then(refresh); }, 60000);
   nextEvent();
-  leafT = setInterval(() => { if (on && !quiet() && SEASON[season].leaves && Math.random() < .35) EV.leaf(); }, 60000);
-  clearInterval(fwT); fwT = setInterval(() => { if (on && !quiet() && fest().feuerwerk && isNight() && Math.random() < .7) EV.feuerwerk(); }, 2600);
+  leafT = setInterval(() => { if (on && !document.hidden && !quiet() && SEASON[season].leaves && Math.random() < .35) EV.leaf(); }, 60000);
+  clearInterval(fwT); fwT = setInterval(() => { if (on && !document.hidden && !quiet() && fest().feuerwerk && isNight() && Math.random() < .7) EV.feuerwerk(); }, 2600);
   setTimeout(() => { if (on && !quiet()) fire(TH === "wasser" ? "fische" : isNight() ? "star" : "plane"); }, 4000);
 };
 // Test-Werkzeuge fürs Design-Menü
@@ -4061,7 +4031,7 @@ function heroFeier() {
   el.innerHTML = icon("clock", 15) + esc(f.t || "");
 }
 // Feierabend-Zeile ist nur Anzeige – Arbeitszeit ändert man in den Einstellungen
-setInterval(heroFeier, 30000);
+setInterval(whenVisible(heroFeier), 30000);
 
 // Kalender-Knopf: Monat an/aus
 $("cal-btn").addEventListener("click", () => $("view-seg").querySelector(`[data-view="${view === "month" ? "list" : "month"}"]`)?.click());
@@ -4087,7 +4057,7 @@ async function loadWeek(force) {
   if (!force && week && week.key === key && Date.now() - week.t < 3600e3) return renderWeek();
   try {
     const d = (await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${pl.lat}&longitude=${pl.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&timezone=auto`)).json()).daily;
-    week = { key, name: pl.name, t: Date.now(), days: d.time.map((t, i) => ({ t, c: d.weather_code[i], hi: Math.round(d.temperature_2m_max[i]), lo: Math.round(d.temperature_2m_min[i]), p: d.precipitation_probability_max?.[i] ?? null })) };
+    week = { key, name: pl.name, t: Date.now(), days: d.time.map((t, i) => ({ t, c: d.weather_code[i], hi: Math.round(d.temperature_2m_max[i]), lo: Math.round(d.temperature_2m_min[i]), p: Number.isFinite(+d.precipitation_probability_max?.[i]) ? Math.round(+d.precipitation_probability_max[i]) : null })) };
     store.set("erledigt-woche", week);
   } catch {}
   renderWeek();
@@ -4196,7 +4166,6 @@ if (!MINI) window.desktop?.version?.().then((v) => {
   store.set("erledigt-last-version", v);
   if (last && last !== v && v !== "1.4.3") setTimeout(() => { showBadge(`Aktualisiert auf ${v}`, "Was neu ist, steht in den Mitteilungen.", "up", true); addNote({ kind: "update", ic: "up", title: `Aktualisiert auf ${v}`, sub: (CHANGELOG[v] || ["Kleine Verbesserungen"]).map((x) => "• " + x).join("\n") }); }, 1500);
 });
-let verText = "";
 const setVer = (t, keep) => { $("ver").textContent = t; clearTimeout(setVer.t); if (!keep) setVer.t = setTimeout(() => window.desktop?.version?.().then((v) => { $("ver").textContent = "Erledigt v" + v; }), 6000); };
 $("ver").addEventListener("click", () => { if ($("ver").dataset.url) { window.open($("ver").dataset.url, "_blank"); return; } window.desktop?.checkUpdates?.(); setVer("Suche Update …"); });
 // Update-Anzeige: Karte mit Ladebalken beim Herunterladen, großer Bildschirm beim Installieren
@@ -4359,7 +4328,11 @@ if (!window.desktop) {
     if (!NATIVE_AI) return;
     e.stopImmediatePropagation(); e.preventDefault();
     const open = aiOpen().slice(0, 25), t = todayD();
+    // Einmal-Schlüssel: nur Antworten aus genau diesem Fenster dürfen Aufgaben ändern (fremde ?ai=-Links werden ignoriert)
+    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
+    store.set("erledigt-ai-nonce", { n: nonce, at: Date.now() });
     const c = {
+      nonce,
       name: userName(), priv: privMode(), theme: document.body.classList.contains("is-dark") ? "dark" : "light",
       accent: (getComputedStyle(document.documentElement).getPropertyValue("--accent").trim().match(/^#[0-9a-f]{6}$/i) || [""])[0],
       today: `${WD[t.getDay()]} ${iso(t)}`, days: Array.from({ length: 7 }, (_, i) => { const d = addDays(t, i + 1); return `${WD[d.getDay()].slice(0, 2)} ${iso(d)}`; }).join(", "),
@@ -4375,7 +4348,10 @@ if (!window.desktop) {
     let tries = 40;
     const go = () => {
       if (!loaded) { if (tries-- > 0) setTimeout(go, 250); return; }
-      try { const { a, ids } = JSON.parse(unb64(aiq)); if (aiApply(a, ids, null)) { sfx.done?.(); showToast(a.typ === "neue_aufgabe" ? `Aufgabe „${a.titel}“ angelegt` : "Übernommen"); render(); } else showToast("Das ging nicht – Aufgabe nicht gefunden"); }
+      try {
+        const { a, ids, nonce } = JSON.parse(unb64(aiq)), ok = store.get("erledigt-ai-nonce", null);
+        if (!ok || !nonce || nonce !== ok.n || Date.now() - ok.at > 2 * 3600e3) { showToast("Unbekannter Assistenten-Link – ignoriert"); return; }
+        if (aiApply(a, ids, null)) { sfx.done?.(); showToast(a.typ === "neue_aufgabe" ? `Aufgabe „${a.titel}“ angelegt` : "Übernommen"); render(); } else showToast("Das ging nicht – Aufgabe nicht gefunden"); }
       catch { showToast("Aktion vom Assistenten war unlesbar"); }
     };
     go();
