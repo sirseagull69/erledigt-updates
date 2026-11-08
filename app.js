@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.1 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.2 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -543,7 +543,7 @@ function updateHint() {
     return;
   }
   $("hint").classList.toggle("idle", !v.trim());
-  if (!v.trim()) { $("hint").innerHTML = `Tipp: <code>morgen 14:30</code> Erinnerung · <code>donnerstags</code> wiederholen · <code>!</code> hoch · ${privMode() ? "<code>#einkaufen</code>" : "<code>#privat</code>"} · <code>/</code> Vorlagen`; if (list === "einkaufen") $("hint").innerHTML = `Tipp: <code>Milch, Brot, Eier</code> legt drei Artikel an · unten im Katalog antippen · Kachel antippen = gekauft`; return; }
+  if (!v.trim()) { $("hint").innerHTML = `Tipp: <code>morgen 14:30</code> Erinnerung · <code>donnerstags</code> wiederholen · <code>!</code> hoch · ${privMode() ? "<code>#einkaufen</code>" : "<code>#privat</code>"} · <code>/</code> Vorlagen`; if (list === "einkaufen") $("hint").innerHTML = `<code>Milch, Brot, Eier</code> legt mehrere Artikel an · Kachel antippen = gekauft`; return; }
   const p = parseInput(v);
   const bits = [listById[p.list || (list === "alle" ? defList() : list)].name, prioById[p.prio || draftPrio].name];
   if (p.due) bits.push(dueText(p));
@@ -1262,25 +1262,34 @@ function shopIcon(title) {
 }
 const shopItems = () => items.filter((t) => !t.archived && t.list === "einkaufen");
 function shopHtml() {
+  // Bewusst wenig: Korb oben, darunter eine Reihe Vorschläge, der Katalog erst auf Tipp (Regal-Chips) oder beim Suchen.
   const all = shopItems(), open = all.filter((t) => !t.done).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  const cut = Date.now() - 45 * 864e5;
-  const recent = all.filter((t) => t.done && t.doneAt && t.doneAt > cut).sort((a, b) => b.doneAt - a.doneAt);
-  const seenNames = new Set(), recentU = recent.filter((t) => { const k = shopKey(t.title); if (seenNames.has(k)) return false; seenNames.add(k); return true; }).slice(0, 24);
   const openKeys = new Set(open.map((t) => shopKey(t.title)));
-  const tile = (t, cls) => `<button type="button" class="sh-tile ${cls}" data-sh="${t.id}" title="${esc(t.title)}"><span class="sh-ico">${shopIcon(t.title)}</span><span class="sh-name">${esc(t.title)}</span>${t.notes ? `<span class="sh-note">${esc(t.notes.split("\n")[0].slice(0, 18))}</span>` : ""}</button>`;
+  const recent = all.filter((t) => t.done && t.doneAt).sort((a, b) => b.doneAt - a.doneAt);
+  const seenNames = new Set(), sugg = [];
+  for (const t of recent) { const k = shopKey(t.title); if (seenNames.has(k) || openKeys.has(k)) continue; seenNames.add(k); sugg.push({ name: t.title, emoji: shopIcon(t.title) }); if (sugg.length >= 12) break; }
+  for (const x of SHOP_STAPLES) { if (sugg.length >= 12) break; const k = shopKey(x); if (seenNames.has(k) || openKeys.has(k)) continue; seenNames.add(k); sugg.push({ name: x, emoji: shopIcon(x) }); }
+  const tile = (t) => `<button type="button" class="sh-tile in" data-sh="${t.id}" title="Antippen = gekauft"><span class="sh-ico">${shopIcon(t.title)}</span><span class="sh-name">${esc(t.title)}</span></button>`;
+  const ktile = (x, cls = "") => `<button type="button" class="sh-tile${cls}${openKeys.has(shopKey(x.name)) ? " in" : ""}" data-sh-add="${esc(x.name)}"><span class="sh-ico">${x.emoji}</span><span class="sh-name">${esc(x.name)}</span></button>`;
   const q = shopQuery.trim().toLowerCase();
   let h = `<div class="shop">`;
-  h += `<section class="sh-sec sh-korb"><h4><span>Im Korb</span><b>${open.length}</b>${open.length ? `<button type="button" class="sh-all" data-sh-all="1">Alles gekauft</button>` : ""}</h4>`;
-  h += open.length ? `<div class="sh-grid">${open.map((t) => tile(t, "in")).join("")}</div>` : `<div class="sh-empty">Noch nichts im Korb. Unten antippen oder oben eintippen – <code>Milch, Brot, Eier</code> legt gleich drei an.</div>`;
+  h += `<section class="sh-sec sh-korb"><h4><span>Im Korb</span><b>${open.length}</b>${open.length > 1 ? `<button type="button" class="sh-all" data-sh-all="1">Alles gekauft</button>` : ""}</h4>`;
+  h += open.length ? `<div class="sh-grid">${open.map(tile).join("")}</div>` : `<div class="sh-empty">Leer. Tipp unten etwas an oder schreib oben <code>Milch, Brot, Eier</code>.</div>`;
   h += `</section>`;
-  if (recentU.length && !q) h += `<section class="sh-sec"><h4><span>Zuletzt gekauft</span><b>${recentU.length}</b></h4><div class="sh-grid">${recentU.map((t) => tile(t, openKeys.has(shopKey(t.title)) ? "in" : "was")).join("")}</div></section>`;
+  if (sugg.length && !q) h += `<section class="sh-sec"><h4><span>Schnell rein</span></h4><div class="sh-grid sh-small">${sugg.map((x) => ktile(x)).join("")}</div></section>`;
   h += `<section class="sh-sec sh-kat"><h4><span>Katalog</span><input type="search" class="sh-search" placeholder="Suchen …" value="${esc(shopQuery)}" aria-label="Im Katalog suchen"></h4>`;
-  const cats = q ? [["Treffer", SHOP_ITEMS.filter((x) => x.name.toLowerCase().includes(q))]] : SHOP_CATS.map(([c]) => [c, SHOP_ITEMS.filter((x) => x.cat === c)]);
-  cats.forEach(([c, arr]) => { if (!arr.length) return; h += `<div class="sh-cat"><h5>${esc(c)}</h5><div class="sh-grid sh-small">${arr.map((x) => `<button type="button" class="sh-tile${openKeys.has(shopKey(x.name)) ? " in" : ""}" data-sh-add="${esc(x.name)}"><span class="sh-ico">${x.emoji}</span><span class="sh-name">${esc(x.name)}</span></button>`).join("")}</div></div>`; });
-  if (q && !cats[0][1].some((x) => x.name.toLowerCase() === q)) h += `<button type="button" class="sh-tile sh-new" data-sh-add="${esc(shopQuery.trim())}"><span class="sh-ico">➕</span><span class="sh-name">„${esc(shopQuery.trim())}“ hinzufügen</span></button>`;
+  if (q) {
+    const hits = SHOP_ITEMS.filter((x) => x.name.toLowerCase().includes(q)).slice(0, 24);
+    h += `<div class="sh-grid sh-small">${hits.map((x) => ktile(x)).join("")}${hits.some((x) => x.name.toLowerCase() === q) ? "" : ktile({ name: shopQuery.trim(), emoji: "➕" }, " sh-new")}</div>`;
+  } else {
+    h += `<div class="sh-chips">${SHOP_CATS.map(([c]) => `<button type="button" class="chip-btn${shopCat === c ? " on" : ""}" data-sh-cat="${esc(c)}">${esc(c)}</button>`).join("")}</div>`;
+    if (shopCat) h += `<div class="sh-grid sh-small">${SHOP_ITEMS.filter((x) => x.cat === shopCat).map((x) => ktile(x)).join("")}</div>`;
+  }
   h += `</section></div>`;
   return h;
 }
+const SHOP_STAPLES = ["Milch", "Brot", "Eier", "Butter", "Käse", "Bananen", "Äpfel", "Tomaten", "Nudeln", "Toilettenpapier", "Joghurt", "Kaffee"];
+let shopCat = "";
 let shopQuery = "";
 function shopAdd(name) {
   const k = shopKey(name), ex = shopItems().find((t) => !t.done && shopKey(t.title) === k);
@@ -1290,6 +1299,7 @@ function shopAdd(name) {
 $("tasks").addEventListener("click", async (e) => {
   if (list !== "einkaufen") return;
   const all = e.target.closest("[data-sh-all]"); if (all) { const ids = shopItems().filter((t) => !t.done).map((t) => t.id); burst(all, 24, 1.6); sfx.done(); for (const id of ids) toggleDone(id); render(); return; }
+  const cat = e.target.closest("[data-sh-cat]"); if (cat) { shopCat = shopCat === cat.dataset.shCat ? "" : cat.dataset.shCat; render(); return; }
   const add = e.target.closest("[data-sh-add]"); if (add) { shopAdd(add.dataset.shAdd); render(); const s = $("tasks").querySelector(".sh-search"); if (s && shopQuery) { shopQuery = ""; render(); } return; }
   const b = e.target.closest("[data-sh]"); if (!b) return;
   const id = b.dataset.sh, t = items.find((x) => x.id === id); if (!t) return;
@@ -1321,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.2": ["Neue Landschaft Fjord – nachts mit Nordlicht, das sich im Wasser spiegelt", "Einkaufen aufgeräumt: Korb, „Schnell rein“, Regale nur auf Tipp", "Dschungel ist raus"],
   "2.8.1": ["Dschungel: Fluss und überwachsener Tempel, weniger Papageien", "Unterwasser ohne Lichtstrahlen"],
   "2.8.0": ["Einkaufen wie bei Bring: Kacheln, Katalog nach Regalen, Zuletzt gekauft – Tipp aufs Kästchen = gekauft", "Oben „Milch, Brot, Eier“ eintippen legt gleich drei Artikel an", "Neue Landschaften: Unterwasser und Dschungel"],
   "2.7.5": ["Feiertage in der Landschaft: Advent, Weihnachten, Silvester-Feuerwerk, Ostern, Halloween – automatisch am richtigen Tag", "Ausprobieren: Einstellungen → Himmel testen → Anlass"],
@@ -1548,7 +1559,7 @@ function renderDesign() {
     <section class="st-sec"><h3>Modus</h3>${opt("mode", [["arbeit", "Arbeit"], ["privat", "Privat"]])}</section>
     <section class="st-sec"><h3>Hell oder Dunkel</h3>${opt("theme", [["system", window.desktop?.platform === "darwin" ? "Wie Mac" : "Wie Windows"], ["light", "Hell"], ["dark", "Dunkel"]], theme)}</section>
     <section class="st-sec"><h3>Farbe</h3><div class="st-tiles">${Object.entries(PRESETS).map(swatch).join("")}<label class="st-tile custom" aria-pressed="${!!design.custom}"><i style="--a:${design.custom || "#f43f5e"};--b:${design.custom || "#3b82f6"}"${design.custom ? "" : ' class="rainbow"'}></i><span>Eigene</span><input type="color" id="custom-color" value="${cust}"></label></div></section>
-    <section class="st-sec"><h3>Landschaft</h3>${opt("scene", [["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"], ["wasser", "Unterwasser"], ["dschungel", "Dschungel"]])}</section>
+    <section class="st-sec"><h3>Landschaft</h3>${opt("scene", [["wald", "Schwarzwald"], ["alpen", "Alpen"], ["kueste", "Küste"], ["stadt", "Stadt"], ["schlicht", "Schlicht"], ["wasser", "Unterwasser"], ["fjord", "Fjord"]])}</section>
     <section class="st-sec"><h3>Arbeitstag</h3><div class="st-list">
       <button type="button" class="st-item" data-setup="1"><span class="st-l"><b>Arbeitszeit</b><small>${feierabendAt() ? `${arbeitsbeginn()} – ${feierabendAt()} Uhr` : "keine festgelegt"}</small></span>${chev}</button>
       <button type="button" class="st-item" id="setup-open"><span class="st-l"><b>Name & Wetter-Ort</b><small>${esc(design.name || "kein Name")} · ${esc(weatherPlace().name)}</small></span>${chev}</button>
@@ -3028,8 +3039,8 @@ const LAYERS = [ // seed, Grundlinie, Höhe, Rauheit, Tannen
 // Vordergrund im hohen Modus: nahe Wiese mit Bäumen, ganz vorne ein Hang
 const FRONT = [[78, 236, 10, 1.5, .4], [91, 274, 8, 1.3, .26]];
 let L = {}, layerEls = [], leafEls = [];
-// Landschaften: wald (Schwarzwald), alpen, kueste, stadt, schlicht, wasser (Unterwasser), dschungel – Auswahl im Design-Menü
-const THEMES = ["wald", "alpen", "kueste", "stadt", "schlicht", "wasser", "dschungel"];
+// Landschaften: wald (Schwarzwald), alpen, kueste, stadt, schlicht, wasser (Unterwasser), fjord – Auswahl im Design-Menü
+const THEMES = ["wald", "alpen", "kueste", "stadt", "schlicht", "wasser", "fjord"];
 const theme = () => { try { return THEMES.includes(design.scene) ? design.scene : "wald"; } catch { return "wald"; } };
 const LAYERS_ALP = [[11, 104, 92, 2.4, 0], [23, 128, 66, 2, 0], [37, 158, 20, 1.4, .3], [51, 176, 12, 1.6, .55], [64, 196, 8, 1.8, .72]];
 // Alpen: schroffe, hohe Felsgipfel statt sanfter Schwarzwaldkuppen
@@ -3097,9 +3108,9 @@ function build() {
   leafEls = []; L.lights = []; L.smoke = null;
   const HOUSE = Math.round(SW * .33), LAKE = [Math.round(SW * .46), Math.round(SW * .46) + 200]; L.lake = LAKE;
   TH = theme();
-  L.shimmer = null; L.frontPts = null; L.beam = null; L.rel = []; L.col = [];
+  L.shimmer = null; L.frontPts = null; L.beam = null; L.rel = []; L.col = []; L.refl = null; L.aurora = null;
   if (TH === "wasser") buildWater(defs);
-  else if (TH === "dschungel") buildJungle(defs);
+  else if (TH === "fjord") buildFjord(defs);
   else if (TH === "kueste") buildCoast(defs);
   else if (TH === "stadt") buildCity(defs);
   else if (TH === "schlicht") buildPlain();
@@ -3302,43 +3313,53 @@ function fogBand(base, R) { const fg = mk("g", { filter: "url(#sc-blur8)" }); fo
 const layer = (d) => { const g = mk("g", {}), p = mk("path", { d }, g); layerEls.push(p); return p; };
 const ridgeD = (pts) => `M-10 ${SH} L${pts.map((p) => p[0] + " " + p[1].toFixed(1)).join(" L")} L${SW + 10} ${SH}Z`;
 
-// ---------- Dschungel: Kronendach in Schichten, Wasserfall, Lianen, große Blätter vorne – Papageien, Schmetterlinge, nachts Glühwürmchen ----------
-const JUNGLE = ["#7FAE8C", "#5E9A6E", "#447F57", "#2F6644", "#214E33", "#163B25", "#102C1B"];
-function buildJungle(defs) {
-  // Ruhig wie der Schwarzwald: Kammlinien hintereinander im Dunst, darauf Silhouetten von Palmen, Urwaldriesen und runden Kronen.
-  const R = seeded(173), f1 = (n) => n.toFixed(1);
-  const jl = (d, k, j) => { const p = layer(d); p.dataset.k = k; p.dataset.j = j; return p; };
-  const near = (pts, x) => pts.reduce((m, q) => (Math.abs(q[0] - x) < Math.abs(m[0] - x) ? q : m), pts[0]);
-  const palm = (x, y, h, lean) => { const tx = x + lean, ty = y - h; let d = ` M${f1(x - 1)} ${y + 3} Q${f1(x + lean * .5 - .9)} ${f1(y - h * .5)} ${f1(tx - .7)} ${f1(ty)} L${f1(tx + .7)} ${f1(ty)} Q${f1(x + lean * .5 + .9)} ${f1(y - h * .5)} ${f1(x + 1)} ${y + 3}Z`; for (let f = 0; f < 7; f++) { const a = -.05 - f * (Math.PI * .95 / 6), l = h * (.42 + R() * .18), ex = tx + Math.cos(a) * l, ey = ty - Math.sin(a) * l * .35 + l * .3; d += ` M${f1(tx)} ${f1(ty)} Q${f1((tx + ex) / 2 + Math.cos(a) * 2)} ${f1((ty + ey) / 2 - l * .38)} ${f1(ex)} ${f1(ey)} Q${f1((tx + ex) / 2)} ${f1((ty + ey) / 2 - l * .06)} ${f1(tx)} ${f1(ty)}Z`; } return d; };
-  const giant = (x, y, h) => { const w = h * .06; let d = ` M${f1(x - w)} ${y + 3} L${f1(x - w * .5)} ${f1(y - h)} L${f1(x + w * .5)} ${f1(y - h)} L${f1(x + w)} ${y + 3}Z M${f1(x - w * 2.4)} ${y + 3} Q${f1(x - w * .8)} ${f1(y - h * .12)} ${f1(x - w * .5)} ${f1(y - h * .22)} L${f1(x + w * .5)} ${f1(y - h * .22)} Q${f1(x + w * .8)} ${f1(y - h * .12)} ${f1(x + w * 2.4)} ${y + 3}Z`; [[0, -.08, .34], [-.3, .02, .26], [.3, .03, .26], [-.5, .14, .18], [.5, .15, .18]].forEach(([dx, dy, rr]) => { const cx = x + dx * h, cy = y - h + dy * h, r = rr * h; d += ` M${f1(cx - r)} ${f1(cy + r * .5)} a${f1(r)} ${f1(r * .55)} 0 1 1 ${f1(2 * r)} 0Z`; }); return d; };
-  const crown = (x, y, r) => ` M${f1(x - r)} ${f1(y + 2)} a${f1(r)} ${f1(r * .85)} 0 1 1 ${f1(2 * r)} 0Z`;
-  // Ferne Karsthügel, zwei Stufen, dazwischen Dunst
-  jl(ridgeD(ridgePts(7, 96, 34, 1, false).map(([x, y]) => [x, y + 10 * Math.max(0, Math.sin(x / 110 + 1))])), .12, 0);
-  jl(ridgeD(ridgePts(11, 118, 36, 1, false).map(([x, y]) => [x, y + 12 * Math.max(0, Math.sin(x / 70))])), .24, 0); fogBand(126, R);
-  // Kronendach in drei Stufen: dichte Kronen auf der Kammlinie, ein paar Palmen und Riesen, die rausragen
-  const RX = SW * .56, TX = SW * .28; // Fluss vorne, Ruine hinten
-  [[23, 142, 10, 7, .55, 2, 1, .4], [37, 164, 9, 9, .6, 3, 1, .58], [51, SH > 210 ? 222 : 190, 8, 12, .65, 3, 2, .78]].forEach(([seed, base, amp, size, dens, palms, giants, k], i) => {
-    const pts = ridgePts(seed, base, amp, .6, false);
-    if (i === 2) { pts.forEach((q) => { if (Math.abs(q[0] - RX) < 90) q[1] += 14 * Math.cos((q[0] - RX) / 90 * Math.PI / 2); }); // Senke: hier liegt der Fluss
-      mk("ellipse", { cx: RX, cy: base + 10, rx: 92, ry: 8, fill: "url(#sc-lake)" });
-      L.shimmer = mk("g", {}, mv); for (let j = 0; j < 9; j++) mk("path", { d: `M${f1(RX - 70 + R() * 130)} ${f1(base + 6 + R() * 8)} h${f1(5 + R() * 9)}`, stroke: "#fff", "stroke-width": .7, "stroke-linecap": "round", class: "shim", style: `animation-delay:${R() * 3}s` }, L.shimmer); }
-    let d = ridgeD(pts);
-    for (let x = -10; x < SW + 10; x += size * .9) { if (i === 2 && Math.abs(x - RX) < 80) continue; if (R() < dens) { const q = near(pts, x); d += crown(x, q[1], size * (.6 + R() * .6)); } }
-    if (i === 1) { const q = near(pts, TX), x = q[0], y = q[1] + 2; d += ` M${f1(x - 30)} ${y + 4} L${f1(x - 30)} ${y - 6} L${f1(x - 22)} ${y - 6} L${f1(x - 22)} ${y - 14} L${f1(x - 14)} ${y - 14} L${f1(x - 14)} ${y - 22} L${f1(x - 6)} ${y - 22} L${f1(x - 6)} ${y - 30} L${f1(x + 6)} ${y - 30} L${f1(x + 6)} ${y - 22} L${f1(x + 14)} ${y - 22} L${f1(x + 14)} ${y - 14} L${f1(x + 22)} ${y - 14} L${f1(x + 22)} ${y - 6} L${f1(x + 30)} ${y - 6} L${f1(x + 30)} ${y + 4}Z M${f1(x - 3)} ${y - 30} L${f1(x - 3)} ${y - 36} L${f1(x + 3)} ${y - 36} L${f1(x + 3)} ${y - 30}Z`; } // Stufentempel, längst überwachsen
-    for (let n = 0; n < palms; n++) { const q = near(pts, 30 + R() * (SW - 60)); d += palm(q[0], q[1], size * (2 + R() * .8), (R() - .5) * size * .8); }
-    for (let n = 0; n < giants; n++) { const q = near(pts, 40 + R() * (SW - 80)); d += giant(q[0], q[1], size * (3.4 + R() * 1.2)); }
-    jl(d, k, i + 1);
-    if (i < 2) fogBand(base + 6, R);
+// ---------- Fjord: steile Berge mit Schneekappen beidseits, stilles Wasser, das alles spiegelt – nachts Nordlicht ----------
+function buildFjord(defs) {
+  const R = seeded(211), f1 = (n) => n.toFixed(1), HZ = SH > 210 ? 168 : 146;
+  L.refl = []; L.fjord = { HZ };
+  const fl = (d, k, j, snow) => { const p = layer(d); p.dataset.k = k; p.dataset.j = j; if (snow) { const id = "F" + layerEls.length; const gr = mk("linearGradient", { id: "sc-snow" + id, x1: 0, y1: 0, x2: 0, y2: 1, gradientUnits: "userSpaceOnUse" }, defs); gr.setAttribute("y1", snow[0]); gr.setAttribute("y2", snow[1]); mk("stop", { offset: 0, "stop-color": "#F4F7FB" }, gr); mk("stop", { offset: .35, "stop-color": "#E6ECF3" }, gr); mk("stop", { offset: .5, class: "snowbase" }, gr); p.dataset.snow = id; } return p; };
+  // Nordlicht: liegt hinter den Bergen, bewegt sich langsam; Farbe und Sichtbarkeit setzt draw()
+  const ag = mk("linearGradient", { id: "sc-aur", x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  mk("stop", { offset: 0, "stop-color": "#39E58C", "stop-opacity": 0 }, ag); mk("stop", { offset: .35, "stop-color": "#39E58C", "stop-opacity": .9 }, ag); mk("stop", { offset: 1, "stop-color": "#8B5CF6", "stop-opacity": 0 }, ag);
+  L.aurora = mk("g", { opacity: 0 });
+  [[14, 80, 0, 52000], [40, 70, 1, 68000], [4, 50, 2, 44000], [60, 56, 3, 76000]].forEach(([y0, h, i, dur]) => {
+    let d = `M${-SW * .3} ${y0}`; for (let x = -SW * .3; x <= SW * 1.3; x += 90) d += ` Q${f1(x + 45)} ${f1(y0 + (R() - .5) * 40)} ${f1(x + 90)} ${f1(y0 + (R() - .5) * 20)}`;
+    for (let x = SW * 1.3; x >= -SW * .3; x -= 90) d += ` Q${f1(x - 45)} ${f1(y0 + h + (R() - .5) * 50)} ${f1(x - 90)} ${f1(y0 + h + (R() - .5) * 24)}`; d += "Z";
+    const p = mk("path", { d, fill: "url(#sc-aur)", filter: "url(#sc-blur8)", opacity: .95 - i * .15 }, L.aurora);
+    try { const a = p.animate([{ transform: "translateX(0) skewX(0deg)" }, { transform: `translateX(${i % 2 ? -70 : 70}px) skewX(${i % 2 ? -6 : 6}deg)` }], { duration: dur, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }); a.currentTime = R() * dur; } catch {}
   });
-  // Vorne nur ein dunkler Hang mit zwei großen Palmwedeln am Rand – kein Kleinkram
-  const leaf = (x, y, l, ang, w) => { const ex = x + Math.cos(ang) * l, ey = y - Math.sin(ang) * l, nx = Math.sin(ang) * w, ny = Math.cos(ang) * w; return ` M${f1(x)} ${f1(y)} Q${f1((x + ex) / 2 + nx)} ${f1((y + ey) / 2 + ny)} ${f1(ex)} ${f1(ey)} Q${f1((x + ex) / 2 - nx)} ${f1((y + ey) / 2 - ny)} ${f1(x)} ${f1(y)}Z`; };
-  let d4 = `M-10 ${SH + 10} V${SH - 20} Q${SW * .5} ${SH - 30} ${SW + 10} ${SH - 18} V${SH + 10}Z`;
-  for (let k = 0; k < 4; k++) { d4 += leaf(-8, SH - 14, 80 + R() * 40, .35 + k * .3, 9); d4 += leaf(SW + 8, SH - 14, 80 + R() * 40, Math.PI - .35 - k * .3, 9); }
-  jl(d4, .95, 5);
-  // Zwei Lianen am linken und rechten Rand, schwingen kaum merklich
-  L.lianas = mk("g", {}, mv);
-  [[22, 110], [SW - 26, 130]].forEach(([x, len], i) => { const g = mk("g", { class: "liana" }, L.lianas), sx = (R() - .5) * 24; mk("path", { d: `M${x} -5 Q${f1(x + sx)} ${f1(len * .5)} ${f1(x + sx * .4)} ${len} Q${f1(x + sx * .45)} ${len + 1} ${x + 1.2} -5Z`, class: "lianaS" }, g); for (let k = 0; k < 4; k++) { const t = .3 + k * .18, px = x + sx * (2 * t * (1 - t) + t * t * .4), py = len * t; mk("path", { d: leaf(px, py, 7 + R() * 4, (k % 2 ? -1 : 1) * .5 + .2, 2.2), class: "lianaL" }, g); } try { g.style.transformBox = "view-box"; g.style.transformOrigin = `${x}px -5px`; g.animate([{ transform: "rotate(-1.2deg)" }, { transform: "rotate(1.2deg)" }], { duration: 7000 + i * 1200, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }); } catch {} });
-  L.frontPts = [[SW * .2, SH - 24]]; L.lake = [SW * .2, SW * .2]; L.house = null;
+  // Berge: hinten quer, dann zwei Paare, die von den Seiten ins Wasser laufen
+  const wing = (seed, gapHalf, base, amp, k, j, snowTop) => {
+    const pts = ridgePts(seed, base, amp, 1, true).map(([x, y]) => { const t = Math.min(1, Math.max(0, (Math.abs(x - SW / 2) - gapHalf) / (SW * .14))); const tt = t * t * (3 - 2 * t); return [x, HZ + 14 + (y - HZ - 14) * tt]; });
+    return fl(ridgeD(pts), k, j, snowTop ? [base - amp * 1.05, base - amp * .25] : null);
+  };
+  fl(ridgeD(ridgePts(13, HZ - 26, 52, 1, true)), .18, 0, [HZ - 80, HZ - 36]); fogBand(HZ - 20, R);
+  wing(31, SW * .1, HZ - 34, 96, .4, 1, true);
+  wing(37, SW * .26, HZ - 30, 130, .64, 2, true);
+  // Wasser
+  mk("rect", { x: 0, y: HZ, width: SW, height: SH - HZ + 20, fill: "url(#sc-lake)" });
+  // Spiegelung: Kopien von Nordlicht und Bergen, gespiegelt und nur im Wasser sichtbar
+  const rc = mk("clipPath", { id: "sc-fjc" }, defs); mk("rect", { x: 0, y: HZ, width: SW, height: SH - HZ + 20 }, rc);
+  const rg = mk("g", { "clip-path": "url(#sc-fjc)", transform: `translate(0 ${2 * HZ}) scale(1 -1)`, opacity: .55 });
+  L.auroraR = mk("g", { opacity: 0 }, rg); L.aurora.querySelectorAll("path").forEach((p) => { const c = mk("path", { d: p.getAttribute("d"), fill: "url(#sc-aur)", filter: "url(#sc-blur8)", opacity: p.getAttribute("opacity") }, L.auroraR); });
+  layerEls.forEach((p) => { const c = mk("path", { d: p.getAttribute("d") }, rg); L.refl.push([c, p]); });
+  L.shimmer = mk("g", {}, mv);
+  for (let j = 0; j < Math.ceil(SW / 30); j++) mk("path", { d: `M${f1(R() * SW)} ${f1(HZ + 4 + R() * (SH - HZ - 6))} h${f1(5 + R() * 12)}`, stroke: "#fff", "stroke-width": .7, "stroke-linecap": "round", class: "shim", style: `animation-delay:${R() * 3}s` }, L.shimmer);
+  // Ufer vorne links mit rotem Fischerhaus auf Stelzen, Steg und Boot
+  const SX = SW * .14, SY = HZ + 36;
+  fl(`M-10 ${SH + 10} V${f1(SY - 8)} Q${f1(SX - 40)} ${f1(SY - 14)} ${f1(SX)} ${f1(SY - 4)} Q${f1(SX + 50)} ${f1(SY + 6)} ${f1(SX + 70)} ${f1(SY + 18)} Q${f1(SX + 80)} ${f1(SY + 30)} ${f1(SX + 60)} ${SH + 10}Z`, .92, 3);
+  const hx = SX + 6, hy = SY - 4; L.house = [hx, hy];
+  const hut = mk("g", {}); L.col = L.col || [];
+  const col = (el, c) => { L.col.push([el, c]); return el; };
+  [[-13, 0], [-5, 0], [3, 0], [11, 0]].forEach(([dx]) => col(mk("rect", { x: hx + dx - .8, y: hy - 2, width: 1.6, height: 7, fill: "#3B2E24" }, hut), "#3B2E24")); // Stelzen
+  col(mk("path", { d: `M${hx - 15} ${hy - 2} V${hy - 16} L${hx} ${hy - 25} L${hx + 15} ${hy - 16} V${hy - 2}Z`, fill: "#B33A2E" }, hut), "#B33A2E");
+  col(mk("path", { d: `M${hx - 17} ${hy - 15} L${hx} ${hy - 26.5} L${hx + 17} ${hy - 15} L${hx + 15} ${hy - 14} L${hx} ${hy - 24.5} L${hx - 15} ${hy - 14}Z`, fill: "#F2F0E8" }, hut), "#F2F0E8");
+  [[-7, -9], [6, -9], [0, -18]].forEach(([dx, dy], j) => { const w = mk("rect", { x: hx + dx - 1.6, y: hy + dy - 1.4, width: 3.2, height: 2.8, fill: "#FFC96E" }, hut); L.lights.push([w, j * .05]); });
+  col(mk("path", { d: `M${hx + 15} ${hy - 1} L${hx + 58} ${hy + 10} L${hx + 58} ${hy + 12.5} L${hx + 15} ${hy + 1.5}Z`, fill: "#4A3A2C" }, hut), "#4A3A2C"); // Steg
+  [[22, 2], [34, 5], [46, 8], [56, 10.5]].forEach(([dx, dy]) => col(mk("rect", { x: hx + dx - .7, y: hy + dy, width: 1.4, height: 6, fill: "#3B2E24" }, hut), "#3B2E24"));
+  const boat = mk("g", {}, mv); col(mk("path", { d: `M${hx + 44} ${hy + 16} Q${hx + 50} ${hy + 22} ${hx + 60} ${hy + 21} L${hx + 63} ${hy + 15} Q${hx + 52} ${hy + 13} ${hx + 44} ${hy + 16}Z`, fill: "#2E4A5E" }, boat), "#2E4A5E");
+  try { boat.animate([{ transform: "translateY(0)" }, { transform: "translateY(1.2px)" }], { duration: 2600, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }); } catch {}
+  L.frontPts = [[SW * .5, SH - 24]]; L.lake = [0, SW]; L.fjordHZ = HZ;
 }
 
 // ---------- Unterwasser: Riff mit Korallen, Lichtstrahlen von oben, Blasen, Seegras – nachts Plankton und Quallen ----------
@@ -3468,7 +3489,7 @@ function draw(m) {
   // Luftperspektive: hinten fast Horizontfarbe, vorne dunkel; tagsüber mit Jahreszeit-Ton
   const deep = mix(mix(top, "#05070F", .55), "#05070F", night * .5);
   layerEls.forEach((el, i) => {
-    if (TH === "dschungel") { const k = +el.dataset.k, j = +el.dataset.j; let c = mix(hor, deep, k); c = mix(c, JUNGLE[Math.min(6, j + 1)], (.28 + j * .08) * (.2 + .8 * d)); el.setAttribute("fill", c); el.dataset.c = c; return; }
+    if (TH === "fjord") { const k = +el.dataset.k, j = +el.dataset.j; let c = mix(hor, deep, k); c = mix(c, j === 3 ? "#2A3A2E" : "#4E5868", (.3 + j * .08) * (.4 + .6 * d)); if (j === 3) c = mix(c, "#0E1420", .3 * (.4 + .6 * d)); if (el.dataset.snow) { el.setAttribute("fill", `url(#sc-snow${el.dataset.snow})`); const st = document.querySelector(`#sc-snow${el.dataset.snow} .snowbase`); st.setAttribute("stop-color", c); document.querySelectorAll(`#sc-snow${el.dataset.snow} stop`).forEach((x, jj) => { if (jj < 2) x.setAttribute("stop-color", mix(["#F4F7FB", "#E6ECF3"][jj], hor, .25 + night * .55)); }); } else el.setAttribute("fill", c); el.dataset.c = c; return; }
     if (TH === "wasser") { const c0 = mix(hor, "#010510", +el.dataset.k || .5); const c = el.dataset.tint ? mix(c0, el.dataset.tint, .7 * lt) : el.dataset.sand ? mix(c0, "#CBB984", .62 * lt) : c0; el.setAttribute("fill", c); el.dataset.c = c; return; }
     const k = Math.min(1, .22 + i * (layerEls.length > 5 ? .13 : .19));
     let c = mix(hor, deep, k);
@@ -3478,6 +3499,8 @@ function draw(m) {
     else { if (i >= 2) c = mix(c, TH === "wald" || TH === "alpen" ? "#0F1C17" : "#0E1420", (.18 + (i - 2) * .14) * (.4 + .6 * d)); el.setAttribute("fill", c); }
     el.dataset.c = c;
   });
+  if (L.refl) L.refl.forEach(([c, p]) => c.setAttribute("fill", p.dataset.snow ? `url(#sc-snow${p.dataset.snow})` : p.dataset.c));
+  if (L.aurora) { const a = Math.max(0, night - .15) * (1 - ov) * .95; L.aurora.setAttribute("opacity", a.toFixed(2)); L.auroraR.setAttribute("opacity", a.toFixed(2)); }
   if (L.rel) L.rel.forEach(([el, li, k]) => { const base = layerEls[li]?.dataset.c; if (base) el.setAttribute("fill", mix(base, k > 0 ? "#06100A" : "#FFFFFF", Math.abs(k) * (k > 0 ? 1 : .5 + .5 * d))); });
   if (L.col) L.col.forEach(([el, c]) => el.setAttribute("fill", mix(c, "#0A1020", night * .85)));
   leafEls.forEach(([el, li, ci]) => { const base = layerEls[li].dataset.c, pal = se.leaf; el.setAttribute("fill", pal.length ? mix(base, pal[ci % pal.length], (.3 + (li - 2) * .07) * (.08 + .92 * d)) : base); el.setAttribute("opacity", pal.length ? 1 : 0); });
@@ -3485,12 +3508,6 @@ function draw(m) {
   if (L.festDark && layerEls.length) L.festDark.forEach((el) => el.setAttribute("fill", mix(layerEls[layerEls.length - 1].dataset.c, "#2E6B40", .25 + .45 * d)));
   { const tq = TH === "alpen" ? .45 * d : 0; document.getElementById("sc-lk0").setAttribute("stop-color", mix(mix(hor, "#000000", .1), "#3FB0BE", tq)); document.getElementById("sc-lk1").setAttribute("stop-color", mix(mix(mid, "#000000", .25), "#1F7F8C", tq)); }
   L.shimmer.setAttribute("opacity", TH === "wasser" ? lt * .55 : .25 + d * .35);
-  if (TH === "dschungel") {
-    const lk = layerEls[layerEls.length - 1]?.dataset.c || "#102C1B";
-    box.querySelectorAll(".lianaS").forEach((e) => e.setAttribute("fill", mix(lk, "#3B2A1A", .35)));
-    box.querySelectorAll(".lianaL").forEach((e) => e.setAttribute("fill", mix(lk, "#4E9A5E", .3 * d)));
-    box.querySelectorAll(".wfall").forEach((e) => e.setAttribute("fill", mix(mix(hor, "#FFFFFF", .55), "#8FB8D8", night * .6)));
-  }
   if (TH === "wasser") {
     L.shafts.setAttribute("opacity", (lt * .9).toFixed(2));
     L.plankton.setAttribute("opacity", (night * .9).toFixed(2));
@@ -3663,39 +3680,14 @@ const EV = {
       g.animate(kf, { duration: rnd(30000, 44000), delay: i * 2500, easing: "linear", fill: "both" }).finished.then(() => g.remove());
     }
   },
-  papagei() { // zwei Aras fliegen vorbei, Flügel schlagen
-    const dir = Math.random() < .5 ? 1 : -1, g = mk("g", {}, L.fx), y0 = rnd(30, 90), night = isNight();
-    [["#D93B3B", "#2E6BD9", "#F2C94C"], ["#2E6BD9", "#F2C94C", "#D93B3B"]].forEach(([c1, c2, c3], i) => {
-      const b = mk("g", { transform: `translate(${i * 26} ${i * 9}) scale(${dir} 1)` }, g), col = (c) => night ? "#101626" : c;
-      mk("path", { d: "M-10 1 L-22 5 L-20 1.5 L-22 -1 Z", fill: col(c3) }, b); // langer Schwanz
-      mk("path", { d: "M-10 0 Q-4 -3.4 4 -2.4 Q7.5 -2 8 0 Q7.5 2 4 2.4 Q-4 3.4 -10 0Z", fill: col(c1) }, b);
-      mk("path", { d: "M8 0 Q10 -2 11.5 -.5 Q11 1 9 1.2Z", fill: night ? "#101626" : "#F5F0E6" }, b);
-      const w1 = mk("path", { d: "M-2 0 Q-6 -10 8 -12 Q2 -6 1 0Z", fill: col(c2) }, b), w2 = mk("path", { d: "M-2 0 Q-6 10 8 12 Q2 6 1 0Z", fill: col(c2), opacity: .8 }, b);
-      [w1, w2].forEach((w, k) => w.animate([{ transform: `scaleY(${k ? -1 : 1})` }, { transform: `scaleY(${k ? .2 : -.2})` }], { duration: 260, iterations: Infinity, direction: "alternate", easing: "ease-in-out" }));
-    });
-    const kf = []; for (let i = 0; i <= 10; i++) kf.push({ transform: `translate(${dir > 0 ? -60 + (SW + 120) * i / 10 : SW + 60 - (SW + 120) * i / 10}px, ${y0 + Math.sin(i * 1.5) * 10 - i * 2}px)` });
-    g.animate(kf, { duration: rnd(11000, 15000), easing: "linear" }).finished.then(() => g.remove());
-  },
-  schmetterling() { // Schmetterlinge flattern über die vorderen Blätter
-    const n = 1 + Math.floor(Math.random() * 2);
-    for (let i = 0; i < n; i++) {
-      const g = mk("g", {}, L.fx), c = ["#3FA7E8", "#F2B33D", "#F26B8A", "#9BE26B"][Math.floor(Math.random() * 4)], x0 = rnd(40, SW - 40), y0 = SH - 60 - rnd(0, 60);
-      const w = mk("path", { d: "M0 0 Q-5 -5 -4 -1 Q-5 3 0 1 Q5 3 4 -1 Q5 -5 0 0Z", fill: c }, g);
-      w.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(.2)" }], { duration: 160 + Math.random() * 80, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
-      const kf = []; let x = x0, y = y0; for (let k = 0; k <= 24; k++) { x += rnd(-16, 16) + (i % 2 ? 6 : -6); y += rnd(-10, 10) - 1; kf.push({ transform: `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`, opacity: k === 0 || k === 24 ? 0 : 1 }); }
-      g.animate(kf, { duration: rnd(12000, 18000), delay: i * 900, easing: "ease-in-out", fill: "both" }).finished.then(() => g.remove());
-    }
-  },
-  gluehwuermchen() { // Glühwürmchen schweben nachts durchs Unterholz
-    const g = mk("g", {}, L.fx);
-    for (let i = 0; i < 12; i++) {
-      const x0 = rnd(20, SW - 20), y0 = rnd(SH * .45, SH - 20), f = mk("g", {}, g);
-      mk("circle", { r: 5, fill: "#D6FF7A", opacity: .4, filter: "url(#sc-blur3)" }, f); const dot = mk("circle", { r: 1.2, fill: "#F2FFB0" }, f);
-      dot.animate([{ opacity: 1 }, { opacity: .1 }], { duration: 900 + Math.random() * 1400, iterations: Infinity, direction: "alternate", easing: "ease-in-out", delay: Math.random() * 1000 });
-      const kf = []; let x = x0, y = y0; for (let k = 0; k <= 14; k++) { x += rnd(-14, 14); y += rnd(-9, 9); kf.push({ transform: `translate(${x.toFixed(0)}px, ${y.toFixed(0)}px)`, opacity: k === 0 || k === 14 ? 0 : 1 }); }
-      f.animate(kf, { duration: rnd(16000, 24000), delay: i * 400, easing: "ease-in-out", fill: "both" });
-    }
-    setTimeout(() => g.remove(), 32000);
+  wal() { // Wal taucht kurz auf, bläst und verschwindet wieder
+    if (!L.fjordHZ) return;
+    const HZ = L.fjordHZ, x = rnd(SW * .3, SW * .8), y = HZ + 6 + Math.random() * 12, s = .6 + (y - HZ) / 18, g = mk("g", {}, L.fx), c = mix("#1C2636", "#000", .2);
+    const back = mk("path", { d: "M-30 0 Q-20 -9 -4 -10 Q6 -10.5 10 -8 L12 -14 L15 -7 Q24 -4 30 0Z", fill: c, transform: `translate(${x} ${y}) scale(${s})` }, g);
+    back.style.transformBox = "view-box"; back.style.transformOrigin = `${x}px ${y}px`;
+    back.animate([{ transform: `translate(${x}px, ${y}px) scale(${s}, 0)` }, { transform: `translate(${x}px, ${y}px) scale(${s}, ${s})`, offset: .3 }, { transform: `translate(${x + 10}px, ${y}px) scale(${s}, ${s})`, offset: .6 }, { transform: `translate(${x + 20}px, ${y}px) scale(${s}, 0)` }], { duration: 7000, easing: "ease-in-out", fill: "forwards" });
+    setTimeout(() => { for (let i = 0; i < 6; i++) { const p = mk("circle", { r: 1.2 + Math.random(), fill: "#fff", opacity: .7 }, g); p.animate([{ transform: `translate(${x - 2 * s}px, ${y - 9 * s}px)`, opacity: .8 }, { transform: `translate(${x - 2 * s + (Math.random() - .5) * 14 * s}px, ${y - (22 + Math.random() * 10) * s}px)`, opacity: 0 }], { duration: 1400 + i * 120, easing: "ease-out", fill: "forwards" }); } }, 2100);
+    setTimeout(() => g.remove(), 7600);
   },
   leaf() { // Blätter lösen sich aus einer Baumkrone, flattern im Wind und landen am Boden
     if (!SEASON[season].leaves && season !== "fruehling") return;
@@ -3718,7 +3710,7 @@ const EV = {
     }
   },
 };
-function randomEvent() { const nat = TH === "wald" || TH === "alpen", F = fest(); const pool = TH === "dschungel" ? (isNight() ? ["gluehwuermchen", "gluehwuermchen", "star", "sat"] : ["schmetterling", "birds", "birds", "plane", "papagei"]) : TH === "wasser" ? (isNight() ? ["quallen", "quallen", "fische", "hai"] : ["fische", "fische", "fische", "schildkroete", "hai", "quallen"]) : isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : []), ...(F.halloween ? ["fledermaus", "fledermaus", "fledermaus"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : []), ...(F.ostern && nat ? ["hase", "hase", "hase"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
+function randomEvent() { const nat = TH === "wald" || TH === "alpen", F = fest(); const pool = TH === "fjord" ? (isNight() ? ["star", "star", "sat", "wal"] : ["birds", "birds", "plane", "wal", "wal"]) : TH === "wasser" ? (isNight() ? ["quallen", "quallen", "fische", "hai"] : ["fische", "fische", "fische", "schildkroete", "hai", "quallen"]) : isNight() ? ["star", "star", "sat", "plane", ...(nat ? ["reh"] : []), ...(F.halloween ? ["fledermaus", "fledermaus", "fledermaus"] : [])] : ["plane", "plane", "birds", "birds", ...(nat ? ["reh", "leaf"] : []), ...(F.ostern && nat ? ["hase", "hase", "hase"] : [])]; EV[pool[Math.floor(Math.random() * pool.length)]](); }
 
 
 // ---------- Wetter (Open-Meteo, kein Konto, nur fester Ort Nufringen) ----------
@@ -3888,7 +3880,7 @@ sceneSync = () => {
   nextEvent();
   leafT = setInterval(() => { if (on && !quiet() && SEASON[season].leaves && Math.random() < .35) EV.leaf(); }, 60000);
   clearInterval(fwT); fwT = setInterval(() => { if (on && !quiet() && fest().feuerwerk && isNight() && Math.random() < .7) EV.feuerwerk(); }, 2600);
-  setTimeout(() => { if (on && !quiet()) fire(TH === "wasser" ? "fische" : TH === "dschungel" ? (isNight() ? "gluehwuermchen" : "birds") : isNight() ? "star" : "plane"); }, 4000);
+  setTimeout(() => { if (on && !quiet()) fire(TH === "wasser" ? "fische" : isNight() ? "star" : "plane"); }, 4000);
 };
 // Test-Werkzeuge fürs Design-Menü
 const skyTest = {
