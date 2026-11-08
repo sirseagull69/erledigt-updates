@@ -1203,3 +1203,35 @@ body.boot main > :nth-child(1) { animation-delay: 1.2s; } body.boot main > :nth-
 .ai-foot button { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #06B6D4)) !important; }
 .ai-file.writing .spin { animation-delay: var(--ph, 0s) !important; }
 .ai-work .spark { animation-delay: var(--ph, 0s) !important; } .ai-work span:last-child { animation-delay: var(--ph2, 0s) !important; }
+
+/* ---------- Leistung: drei Stufen als Segment mit gleitender Pille (statt rotem Schalter) ---------- */
+.ai-perf { padding: 12px 16px 10px; }
+.ai-perf .ai-circuit { display: none; }
+.ai-seg { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; padding: 4px; border-radius: 14px; background: color-mix(in srgb, var(--fg) 6%, transparent); border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.ai-seg-pill { position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3); border-radius: 10px; transform: translateX(calc(var(--seg, 0) * 100%)); transition: transform .35s cubic-bezier(.3, 1.3, .5, 1), background .35s ease, box-shadow .35s ease; background: var(--card); box-shadow: 0 2px 8px rgb(0 0 0 / .14), 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
+.ai-perf[data-mode="spar"] .ai-seg-pill { background: color-mix(in srgb, #16A34A 18%, var(--card)); }
+.ai-perf[data-mode="mittel"] .ai-seg-pill { background: color-mix(in srgb, var(--accent) 22%, var(--card)); }
+.ai-perf[data-mode="normal"] .ai-seg-pill { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #06B6D4)); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent); }
+.ai-seg button { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; background: transparent; color: var(--muted); font: 600 12.5px var(--body); padding: 8px 4px; border-radius: 10px; cursor: pointer; transition: color .25s ease; white-space: nowrap; }
+.ai-seg button[aria-checked="true"] { color: var(--fg); }
+.ai-perf[data-mode="spar"] .ai-seg button[aria-checked="true"] { color: #16A34A; }
+.ai-perf[data-mode="normal"] .ai-seg button[aria-checked="true"] { color: #fff; }
+.ai-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ai-perf small { display: block; margin-top: 7px; }
+.ai-perf.bump .ai-seg-pill { animation: segBump .45s ease; }
+@keyframes segBump { 40% { filter: brightness(1.25); } }
+.ai-perf[data-mode="normal"].bump .ai-seg button[aria-checked="true"] svg { animation: boltZap .5s ease; }
+@keyframes boltZap { 30% { transform: scale(1.35) rotate(-8deg); } }
+
+/* ---------- Was die KI gerade tut: Schrittliste ---------- */
+.ai-work { display: block !important; margin-top: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--fg) 3%, transparent); font-size: 12.5px; }
+.ai-work-h { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--fg); }
+.ai-work-h b { font-weight: 600; }
+.ai-work-h #ai-work-t { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; background: none !important; -webkit-background-clip: initial !important; background-clip: initial !important; animation: none !important; }
+.ai-work ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ai-work li { display: flex; align-items: center; gap: 8px; color: var(--muted); animation: aiIn .25s ease both; }
+.ai-work li i { width: 14px; height: 14px; flex: none; border-radius: 50%; display: grid; place-items: center; }
+.ai-work li.ok i { background: color-mix(in srgb, #16A34A 20%, transparent); }
+.ai-work li.ok i::after { content: ""; width: 6px; height: 3px; border-left: 1.6px solid #16A34A; border-bottom: 1.6px solid #16A34A; transform: rotate(-45deg) translate(1px, -1px); }
+.ai-work li.run { color: var(--fg); }
+.ai-work li.run i { border: 2px solid color-mix(in srgb, var(--fg) 15%, transparent); border-top-color: var(--accent); animation: aiSpin .8s linear infinite; animation-delay: var(--ph2, 0s); }

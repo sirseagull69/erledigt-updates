@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.7 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.8 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1331,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.8": ["KI-Leistung jetzt in drei Stufen", "Beim Antworten siehst du Schritt für Schritt, was der Assistent gerade macht"],
   "2.8.7": ["Assistent im eigenen Look", "Lade-Kreis beim Schreiben repariert", "Android: Handy-KI mit Gemini Nano (neue App-Version installieren)"],
   "2.8.6": ["Menüs noch durchsichtiger"],
   "2.8.5": ["Landschaften mit Vorschaubildern, Menüs halbtransparent", "Assistent im neuen Look – Dateien mit Vorschau und Speichern, Fortschritt bleibt stehen bis fertig", "Der Assistent hat jetzt etwas Persönlichkeit"],
@@ -2240,6 +2241,13 @@ let aiModel = store.get("erledigt-ai-model", null), aiCtx = null;
 let aiMsgs = store.get(AI_CHAT_KEY, []);
 // Leistung: „spar“ (Standard) schont den PC, „normal“ antwortet schneller
 let aiMode = store.get("erledigt-ai-mode", "spar");
+// Leistung in drei Stufen: wie viele Rechenkerne/Speicher die KI nimmt (main.js: AI_PROFILES)
+const AI_LEVELS = [
+  ["spar", "Sparsam", '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z"/><path d="M5 19 13 11"/></svg>'],
+  ["mittel", "Ausgewogen", '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8h14M7 8l-3 7h6zM17 8l-3 7h6z"/></svg>'],
+  ["normal", "Volle Leistung", '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>'],
+];
+const AI_LEVEL_HINT = { spar: "Schont den PC – 2 Rechenkerne, wenig Speicher. Antworten dauern etwas länger.", mittel: "Guter Mittelweg – ein Drittel der Rechenkerne, PC bleibt flüssig.", normal: "Volle Leistung – halbe CPU und mehr Speicher, am schnellsten. Der PC wird kurz lauter." };
 AI?.mode?.(aiMode);
 const aiSave = () => store.set(AI_CHAT_KEY, aiMsgs.slice(-30));
 const SEND_IC = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
@@ -2249,7 +2257,7 @@ const STOP_IC = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="tr
 function aiOpen() {
   return items.filter((t) => !t.done && !t.archived)
     .sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : (a.due || "9999") > (b.due || "9999") ? 1 : PRIO_RANK[a.prio] - PRIO_RANK[b.prio]))
-    .slice(0, aiMode === "spar" ? 25 : 60);
+    .slice(0, aiMode === "spar" ? 25 : aiMode === "mittel" ? 40 : 60);
 }
 function aiTaskLine(t, n) {
   const cl = t.checklist || [];
@@ -2419,7 +2427,7 @@ function aiShell() {
       <button type="button" id="ai-new" title="Neuer Chat">Neu</button>
       <button type="button" class="x" id="ai-close" aria-label="Schließen (Esc)">×</button>
     </div>
-    <div class="ai-perf" id="ai-perf" data-mode="spar"><div class="ai-perf-row"><button type="button" class="pl pl-spar" data-mode="spar">Sparsam</button><div class="ai-slider" id="ai-slider" role="switch" tabindex="0" aria-checked="false" aria-label="Volle Leistung"><span class="glow"></span><span class="knob"><svg class="i-leaf" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z"/><path d="M5 19 13 11"/></svg><svg class="i-bolt" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span></div><button type="button" class="pl pl-full" data-mode="normal">Volle Leistung</button></div><small id="ai-perf-hint"></small></div>
+    <div class="ai-perf" id="ai-perf" data-mode="spar"><div class="ai-seg" id="ai-seg" role="radiogroup" aria-label="Leistung"><span class="ai-seg-pill" aria-hidden="true"></span>${AI_LEVELS.map(([m, l, ic]) => `<button type="button" role="radio" data-mode="${m}" aria-checked="false">${ic}<span>${l}</span></button>`).join("")}</div><small id="ai-perf-hint"></small></div>
     <div class="ai-body" id="ai-body"></div>
     <div class="ai-ctx" id="ai-ctx" hidden></div>
     <div class="ai-chips" id="ai-chips"></div>
@@ -2439,69 +2447,28 @@ function aiChips() {
 function aiRenderPerf() {
   const p = $("ai-perf"); if (!p) return;
   p.dataset.mode = aiMode;
-  $("ai-slider").setAttribute("aria-checked", String(aiMode === "normal"));
-  $("ai-slider").querySelector(".knob").style.transform = "";
-  $("ai-perf-hint").textContent = aiMode === "spar" ? "Schont den PC – 2 Rechenkerne, wenig Speicher, Antwort dauert etwas länger" : "Volle Leistung – mehr Rechenkerne und Speicher, schnellere Antworten";
+  const i = Math.max(0, AI_LEVELS.findIndex(([m]) => m === aiMode));
+  p.style.setProperty("--seg", i);
+  p.querySelectorAll("[data-mode]").forEach((b) => b.tagName === "BUTTON" && b.setAttribute("aria-checked", String(b.dataset.mode === aiMode)));
+  $("ai-perf-hint").textContent = AI_LEVEL_HINT[aiMode] || "";
 }
 function aiSetMode(m) {
+  if (!AI_LEVELS.some(([x]) => x === m)) return;
   if (m === aiMode) { aiRenderPerf(); return; }
   aiMode = m; store.set("erledigt-ai-mode", aiMode); AI?.mode?.(aiMode); aiWarmKey = "";
-  const sl = $("ai-slider"), p = $("ai-perf");
   aiRenderPerf();
-  if (p && m === "normal") { aiDrawCircuit(); p.classList.remove("flow"); void p.offsetWidth; p.classList.add("flow"); clearTimeout(p._fx); p._fx = setTimeout(() => p.classList.remove("flow"), 1900); }
+  const p = $("ai-perf"); if (p) { p.classList.remove("bump"); void p.offsetWidth; p.classList.add("bump"); }
 }
-// Leiterbahnen vom Regler nach links/rechts – ruhig, rechtwinklig mit 45°-Knicken, Lötpunkte am Ende
-function aiDrawCircuit() {
-  const p = $("ai-perf"), sl = $("ai-slider"); if (!p || !sl) return;
-  const pr = p.getBoundingClientRect(), r = sl.getBoundingClientRect();
-  const W = Math.round(pr.width), H = Math.round(pr.height), x1 = r.left - pr.left, x2 = r.right - pr.left, cy = r.top - pr.top + r.height / 2;
-  const tr = [];
-  // nach rechts: drei Bahnen, nach links: zwei
-  [[-8, -1], [0, 0], [8, 1]].forEach(([dy, dir], i) => {
-    const y = cy + dy, sx = x2 + 26 + i * 18, b = dir * (12 + i * 4), ex = Math.max(sx + Math.abs(b) + 20, W - 30 - i * 26);
-    tr.push({ d: `M${x2},${y} H${sx} l${Math.abs(b)},${b} H${ex}`, ex, ey: y + b });
-  });
-  [[-6, -1], [6, 1]].forEach(([dy, dir], i) => {
-    const y = cy + dy, sx = x1 - 18 - i * 14, b = dir * (10 + i * 5), ex = Math.min(sx - Math.abs(b) - 10, 30 + i * 22);
-    tr.push({ d: `M${x1},${y} H${sx} l${-Math.abs(b)},${b} H${ex}`, ex, ey: y + b });
-  });
-  const svg = `<svg class="ai-circuit" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">
-    ${tr.map((x) => `<path class="base" d="${x.d}"/>`).join("")}
-    ${tr.map((x, i) => `<path class="pulse" pathLength="100" d="${x.d}" style="animation-delay:${i * 70}ms"/>`).join("")}
-    ${tr.map((x, i) => `<circle class="pad" cx="${x.ex}" cy="${x.ey}" r="2.4" style="animation-delay:${i * 70}ms"/>`).join("")}</svg>`;
-  p.querySelector(".ai-circuit")?.remove();
-  p.insertAdjacentHTML("afterbegin", svg);
-}
-// Schieberegler: klicken, ziehen oder Tastatur
+function aiDrawCircuit() {}
 function aiSliderInit() {
-  const sl = $("ai-slider"); if (!sl) return;
-  const knob = sl.querySelector(".knob");
-  let drag = null;
-  sl.addEventListener("pointerdown", (e) => {
-    drag = { x0: e.clientX, r: sl.getBoundingClientRect(), moved: false, start: aiMode === "normal" ? 1 : 0, pos: aiMode === "normal" ? 1 : 0 };
-    try { sl.setPointerCapture(e.pointerId); } catch {}
-    sl.classList.add("dragging");
+  const g = $("ai-seg"); if (!g) return;
+  g.addEventListener("click", (e) => { const b = e.target.closest("button[data-mode]"); if (b) aiSetMode(b.dataset.mode); });
+  g.addEventListener("keydown", (e) => {
+    const i = AI_LEVELS.findIndex(([m]) => m === aiMode);
+    if (e.key === "ArrowRight") { e.preventDefault(); aiSetMode(AI_LEVELS[Math.min(2, i + 1)][0]); g.querySelector(`[data-mode="${aiMode}"]`)?.focus(); }
+    if (e.key === "ArrowLeft") { e.preventDefault(); aiSetMode(AI_LEVELS[Math.max(0, i - 1)][0]); g.querySelector(`[data-mode="${aiMode}"]`)?.focus(); }
   });
-  sl.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    const span = drag.r.width - knob.offsetWidth - 6;
-    const dx = e.clientX - drag.x0; if (Math.abs(dx) > 3) drag.moved = true;
-    const pos = Math.max(0, Math.min(span, drag.start * span + dx));
-    knob.style.transform = `translateX(${pos}px)`;
-    drag.pos = pos / span;
-  });
-  const end = () => {
-    if (!drag) return;
-    sl.classList.remove("dragging");
-    const target = drag.moved ? (drag.pos > .5 ? "normal" : "spar") : (aiMode === "spar" ? "normal" : "spar");
-    drag = null; aiSetMode(target);
-  };
-  sl.addEventListener("pointerup", end); sl.addEventListener("pointercancel", end);
-  sl.addEventListener("keydown", (e) => {
-    if (e.key === " " || e.key === "Enter") { e.preventDefault(); aiSetMode(aiMode === "spar" ? "normal" : "spar"); }
-    if (e.key === "ArrowRight") aiSetMode("normal");
-    if (e.key === "ArrowLeft") aiSetMode("spar");
-  });
+  aiRenderPerf();
 }
 function aiRenderHead() {
   const st = $("ai-state"); if (!st) return;
@@ -2594,7 +2561,7 @@ async function aiSend(raw) {
   aiMsgs.push({ role: "user", content: aiUserText(raw), show: raw, ctxTitle: ctxT ? ctxT.title : "", t: Date.now() });
   aiSave();
   aiBusy = true; aiStream = ""; aiPhase = ""; const req = ++aiReq;
-  aiT0 = Date.now(); clearInterval(aiTick); aiTick = setInterval(() => { const t = $("ai-work-t"); if (t) t.textContent = aiWorkText(); }, 1000);
+  aiT0 = Date.now(); aiSawLoad = false; aiNTasks = open.length; clearInterval(aiTick); aiTick = setInterval(() => { const t = $("ai-work-t"); if (t) t.textContent = aiWorkText(); }, 1000);
   aiRenderBody();
   const history = aiMsgs.filter((m) => !m.err).slice(-12).map((m) => ({ role: m.role, content: m.content }));
   const r = await AI.chat(aiModel, [{ role: "system", content: aiSystem(open) }, ...history], req);
@@ -2609,12 +2576,34 @@ async function aiSend(raw) {
 const AI_PHASE = { load: "Lade das Modell in den Speicher … (nur beim ersten Mal nach dem Start)", read: "Liest deine Aufgaben und denkt nach …" };
 let aiPhase = "";
 let aiT0 = 0, aiTick = 0;
-const aiWorkText = () => { const sec = Math.max(0, Math.round((Date.now() - aiT0) / 1000)); const st = aiStream ? (/```[\w-]*\n?(?![\s\S]*```)/.test(aiStream) ? "Schreibt Datei" : "Schreibt") : aiPhase === "load" ? "Lädt das Modell" : "Denkt nach"; return `${st} · ${sec < 60 ? sec + " Sek." : Math.floor(sec / 60) + " Min. " + (sec % 60) + " Sek."}`; };
-const aiWork = () => `<div class="ai-work" id="ai-work" style="--ph:-${(Date.now() % 1400) / 1000}s;--ph2:-${(Date.now() % 2200) / 1000}s"><span class="spark"></span><span id="ai-work-t">${aiWorkText()}</span></div>`;
-const aiWait = () => `${aiPhase === "load" ? `<small class="ai-phase">${AI_PHASE.load}</small>` : ""}`;
+// Was die KI gerade tut – als kleine Schrittliste (erledigt ✓ / läuft ◌), dazu die Zeit
+let aiSawLoad = false, aiNTasks = 0;
+function aiSteps() {
+  const st = [{ t: `${aiNTasks} offene ${aiNTasks === 1 ? "Aufgabe" : "Aufgaben"} gelesen`, done: true }];
+  if (aiSawLoad) st.push({ t: aiPhase === "load" ? "Lädt das Modell in den Speicher …" : "Modell geladen", done: aiPhase !== "load" });
+  if (aiPhase === "load") return st;
+  if (!aiStream) { st.push({ t: aiCtx ? "Denkt über die Aufgabe nach …" : "Denkt nach …", done: false }); return st; }
+  st.push({ t: "Nachgedacht", done: true });
+  const parts = aiStream.split(/```([\w-]*)\n?([\s\S]*?)(```|$)/g);
+  let words = 0;
+  for (let i = 0; i < parts.length; i += 4) {
+    words += (parts[i] || "").trim().split(/\s+/).filter(Boolean).length;
+    if (i + 1 >= parts.length) continue;
+    const lang = parts[i + 1], code = parts[i + 2] || "", closed = parts[i + 3] === "```", lines = code ? code.replace(/\n$/, "").split("\n").length : 0;
+    if (lang === "aktion") { let typ = ""; try { typ = JSON.parse(code).typ; } catch {} const h = { neue_aufgabe: "neue Aufgabe", verschieben: "verschieben", erledigt: "abhaken", unterpunkte: "Unterpunkte", notiz: "Notiz" }[typ] || "Aktion"; st.push({ t: closed ? `Vorschlag vorbereitet: ${h}` : `Bereitet Vorschlag vor: ${h} …`, done: closed }); }
+    else { const n = aiFileName((lang || "").toLowerCase(), code); st.push({ t: closed ? `Datei ${n} erstellt · ${lines} Zeilen` : `Schreibt Datei ${n} · ${lines} Zeilen …`, done: closed }); }
+  }
+  const last = parts.length % 4 === 1 ? parts[parts.length - 1] : "";
+  if (!/```[\w-]*\n?(?![\s\S]*```)/.test(aiStream)) st.push({ t: `Schreibt Antwort · ${words} ${words === 1 ? "Wort" : "Wörter"} …`, done: false, last });
+  return st;
+}
+const aiTime = () => { const sec = Math.max(0, Math.round((Date.now() - aiT0) / 1000)); return sec < 60 ? sec + " Sek." : Math.floor(sec / 60) + " Min. " + (sec % 60) + " Sek."; };
+const aiWorkText = () => aiTime();
+const aiWork = () => `<div class="ai-work" id="ai-work" style="--ph:-${(Date.now() % 1400) / 1000}s;--ph2:-${(Date.now() % 800) / 1000}s"><div class="ai-work-h"><span class="spark"></span><b>Arbeitet</b><span id="ai-work-t">${aiTime()}</span></div><ol>${aiSteps().map((x) => `<li class="${x.done ? "ok" : "run"}"><i></i>${esc(x.t)}</li>`).join("")}</ol></div>`;
+const aiWait = () => "";
 AI?.onChunk(({ reqId, text, phase }) => {
   if (reqId !== aiReq || !aiBusy) return;
-  if (phase) aiPhase = phase;
+  if (phase) aiPhase = phase; if (phase === "load") aiSawLoad = true;
   aiStream = text;
   const el = $("ai-live"); if (!el) return;
   el.innerHTML = (aiMd(aiParse(text).text) || aiWait()) + aiWork();
