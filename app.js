@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.5 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.6 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1331,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.6": ["Menüs noch durchsichtiger"],
   "2.8.5": ["Landschaften mit Vorschaubildern, Menüs halbtransparent", "Assistent im neuen Look – Dateien mit Vorschau und Speichern, Fortschritt bleibt stehen bis fertig", "Der Assistent hat jetzt etwas Persönlichkeit"],
   "2.8.4": ["Schöner Start: Logo, Haken, dann blendet alles weich ein"],
   "2.8.3": ["Assistent sieht jetzt nach was aus: Orb, Glanz, sanfte Animationen"],

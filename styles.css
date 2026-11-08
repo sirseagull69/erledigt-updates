@@ -1182,3 +1182,12 @@ body.boot main > :nth-child(1) { animation-delay: 1.2s; } body.boot main > :nth-
 .ai-prev-doc { flex: 1; overflow: auto; padding: 24px 32px; font-size: 15px; line-height: 1.65; }
 .ai-prev-doc table { border-collapse: collapse; font-size: 13.5px; } .ai-prev-doc th, .ai-prev-doc td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; } .ai-prev-doc th { background: var(--chip); }
 .ai-prev-code { flex: 1; overflow: auto; margin: 0; padding: 18px 22px; font: 13px/1.5 ui-monospace, Consolas, monospace; white-space: pre; background: var(--bg); }
+/* 2.8.6: deutlich mehr Durchsicht, dafür kräftigere Unschärfe für die Lesbarkeit */
+.ach-modal, .drawer, .pop, .wx-pop, .search-box, .inbox { background: color-mix(in srgb, var(--card) 48%, transparent); -webkit-backdrop-filter: blur(36px) saturate(1.5); backdrop-filter: blur(36px) saturate(1.5); }
+.ach-modal.design { background: color-mix(in srgb, var(--bg) 50%, transparent); }
+.ach-modal.design > header { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.ach-modal .st-tile, .ach-modal .st-list, .ach-modal .st-land button, .drawer .st-list { background: color-mix(in srgb, var(--card) 38%, transparent); }
+.ai-panel { background: color-mix(in srgb, var(--ai-bg) 62%, transparent); }
+.overlay { background: rgb(10 10 14 / .18); }
+[data-theme="light"] .ach-modal, [data-theme="light"] .drawer, [data-theme="light"] .pop, [data-theme="light"] .wx-pop, [data-theme="light"] .search-box, [data-theme="light"] .inbox, [data-theme="light"] .ach-modal.design { background: color-mix(in srgb, var(--card) 58%, transparent); }
+.ach-modal.design > header { background: color-mix(in srgb, var(--bg) 55%, transparent); -webkit-backdrop-filter: blur(24px) saturate(1.4); backdrop-filter: blur(24px) saturate(1.4); }
