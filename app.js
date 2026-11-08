@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.6 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.7 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1331,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.7": ["Assistent im eigenen Look", "Lade-Kreis beim Schreiben repariert", "Android: Handy-KI mit Gemini Nano (neue App-Version installieren)"],
   "2.8.6": ["Menüs noch durchsichtiger"],
   "2.8.5": ["Landschaften mit Vorschaubildern, Menüs halbtransparent", "Assistent im neuen Look – Dateien mit Vorschau und Speichern, Fortschritt bleibt stehen bis fertig", "Der Assistent hat jetzt etwas Persönlichkeit"],
   "2.8.4": ["Schöner Start: Logo, Haken, dann blendet alles weich ein"],
@@ -2290,7 +2291,7 @@ So antwortest du:
  Ton wie der Absender: Duzt er Nils („Hallo Nils“) → du + „Hallo <Vorname>,“. Kollegen bei Ritterwand duzen sich meist. Sonst Sie.
 3. Wenn Nils eine Nachricht weiterleitet, die er bekommen hat, ist das Info für ihn – keine Mail an ihn. Schlag eine passende Aufgabe vor.
 4. Fehlt dir Wichtiges, stell höchstens zwei kurze Rückfragen.
-4b. Will Nils eine Datei (Webseite, HTML, Skript, Tabelle, Liste zum Speichern): schreib einen Satz davor, dann die KOMPLETTE Datei in EINEM Codeblock mit Sprache (\`\`\`html, \`\`\`md, \`\`\`csv, \`\`\`ps1 …), danach höchstens ein Satz. Die App zeigt den Block als Datei mit Vorschau und Speichern-Knopf. HTML immer vollständig mit <title> und eigenem <style>, ohne externe Links.
+4b. Will Nils eine Datei (Webseite, HTML, Skript, Tabelle, Liste zum Speichern): schreib einen Satz davor, dann die KOMPLETTE Datei in EINEM Codeblock mit Sprache (\`\`\`html, \`\`\`md, \`\`\`csv, \`\`\`ps1 …), danach höchstens ein Satz. Die App zeigt den Block als Datei mit Vorschau und Speichern-Knopf. HTML immer vollständig mit <title> und eigenem <style>, ohne externe Links. Bei Dateien KEIN „Betreff:“ und kein Mail-Format.
 5. Aufgaben ändern kannst du nur mit einem Aktionsblock am Ende; Nils bestätigt ihn per Klick. Behaupte nie, du hättest etwas geändert oder ergänzt.
  Format (ein Block pro Aktion, nur Felder, die du weißt):
 \`\`\`aktion
@@ -2336,17 +2337,17 @@ function aiFileName(lang, code) {
 function aiFileCard(lang, code, open) {
   lang = (lang || "").toLowerCase(); code = code.replace(/\n$/, "");
   const name = aiFileName(lang, code), ext = name.split(".").pop(), kind = (AI_FILE[lang] || AI_FILE[ext] || ["", "Datei"])[1], lines = code ? code.split("\n").length : 0;
-  if (open) return `<div class="ai-file writing"><span class="fi">${esc(ext.toUpperCase())}</span><div class="fm"><b>${esc(name)}</b><small>wird geschrieben … ${lines} ${lines === 1 ? "Zeile" : "Zeilen"}</small></div><span class="spin"></span></div>`;
+  if (open) return `<div class="ai-file writing" style="--ph:-${(Date.now() % 800) / 1000}s"><span class="fi">${esc(ext.toUpperCase())}</span><div class="fm"><b>${esc(name)}</b><small>wird geschrieben … ${lines} ${lines === 1 ? "Zeile" : "Zeilen"}</small></div><span class="spin"></span></div>`;
   const id = aiFiles.push({ name, code, ext }) - 1;
   return `<div class="ai-file" data-file="${id}"><span class="fi">${esc(ext.toUpperCase())}</span><div class="fm"><b>${esc(name)}</b><small>${esc(kind)} · ${lines} ${lines === 1 ? "Zeile" : "Zeilen"}</small></div><div class="fa"><button type="button" data-fview>Vorschau</button><button type="button" data-fcode>Code</button><button type="button" data-fcopy>Kopieren</button><button type="button" data-fsave>Speichern</button></div><pre hidden>${esc(code)}</pre></div>`;
 }
-function aiMd(s) {
+function aiMd(s, final) {
   const parts = s.split(/```([\w-]*)\n?([\s\S]*?)(```|$)/g);
   const out = [];
   for (let i = 0; i < parts.length; i += 4) {
     const p = parts[i] || "";
     out.push(aiMdText(p));
-    if (i + 1 < parts.length && parts[i + 1] !== "aktion") out.push(aiFileCard(parts[i + 1], parts[i + 2] || "", parts[i + 3] !== "```"));
+    if (i + 1 < parts.length && parts[i + 1] !== "aktion") out.push(aiFileCard(parts[i + 1], parts[i + 2] || "", !final && parts[i + 3] !== "```"));
   }
   return out.join("");
 }
@@ -2517,7 +2518,7 @@ function aiMsgHtml(m, i) {
   if (m.role === "user") return `<div class="ai-msg user">${m.ctxTitle ? `<small class="ai-ctxlbl">zu „${esc(m.ctxTitle)}“</small>` : ""}${esc(m.show || m.content)}</div>`;
   if (m.err) return `<div class="ai-msg bot err">${esc(m.content)}</div>`;
   const { text, acts } = aiParse(m.content);
-  return `<div class="ai-msg bot" data-i="${i}">${aiMd(text) || "<p>…</p>"}${acts.map((a, k) => {
+  return `<div class="ai-msg bot" data-i="${i}">${aiMd(text, true) || "<p>…</p>"}${acts.map((a, k) => {
     const d = aiDescribe(a, m.ids, m.ctx), done = m.applied?.[k];
     return `<div class="ai-act${done ? " done" : ""}${d.ok ? "" : " bad"}"><div class="tx"><b>${esc(d.h)}</b>${esc(d.s)}</div>${d.ok ? `<button type="button" data-apply="${k}"${done ? " disabled" : ""}>${done ? "Erledigt ✓" : "Übernehmen"}</button>` : ""}</div>`;
   }).join("")}<div class="tools"><button type="button" data-copy>Kopieren</button>${/^\s*Betreff:/im.test(text) ? '<button type="button" data-mail>Als Mail öffnen</button>' : ""}</div></div>`;
@@ -2609,7 +2610,7 @@ const AI_PHASE = { load: "Lade das Modell in den Speicher … (nur beim ersten M
 let aiPhase = "";
 let aiT0 = 0, aiTick = 0;
 const aiWorkText = () => { const sec = Math.max(0, Math.round((Date.now() - aiT0) / 1000)); const st = aiStream ? (/```[\w-]*\n?(?![\s\S]*```)/.test(aiStream) ? "Schreibt Datei" : "Schreibt") : aiPhase === "load" ? "Lädt das Modell" : "Denkt nach"; return `${st} · ${sec < 60 ? sec + " Sek." : Math.floor(sec / 60) + " Min. " + (sec % 60) + " Sek."}`; };
-const aiWork = () => `<div class="ai-work" id="ai-work"><span class="spark"></span><span id="ai-work-t">${aiWorkText()}</span></div>`;
+const aiWork = () => `<div class="ai-work" id="ai-work" style="--ph:-${(Date.now() % 1400) / 1000}s;--ph2:-${(Date.now() % 2200) / 1000}s"><span class="spark"></span><span id="ai-work-t">${aiWorkText()}</span></div>`;
 const aiWait = () => `${aiPhase === "load" ? `<small class="ai-phase">${AI_PHASE.load}</small>` : ""}`;
 AI?.onChunk(({ reqId, text, phase }) => {
   if (reqId !== aiReq || !aiBusy) return;
@@ -4340,6 +4341,43 @@ if (!window.desktop && matchMedia("(hover: none)").matches) {
     setTimeout(() => (swiped = false), 60);
   };
   $("tasks").addEventListener("touchend", swEnd); $("tasks").addEventListener("touchcancel", swEnd);
+}
+
+// ---------- Handy-KI (Android-App ab 3.0): Assistent-Knopf öffnet das native Fenster mit Gemini Nano ----------
+// Die App startet die Seite mit ?app=android3. Wir merken uns das, zeigen den ✦-Knopf und übergeben beim Öffnen die offenen Aufgaben.
+// Antworten mit Aktionen kommen als ?ai=<base64-JSON> zurück und werden hier wie am PC angewendet (aiApply).
+if (!window.desktop) {
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("app") === "android3") store.set("erledigt-android-ai", true);
+  const NATIVE_AI = store.get("erledigt-android-ai", false) && /Android/.test(navigator.userAgent);
+  if (NATIVE_AI) document.body.classList.add("native-ai");
+  const b64u = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const unb64 = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
+  $("ai-btn")?.addEventListener("click", (e) => {
+    if (!NATIVE_AI) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    const open = aiOpen().slice(0, 25), t = todayD();
+    const c = {
+      name: userName(), priv: privMode(), theme: document.body.classList.contains("is-dark") ? "dark" : "light",
+      accent: (getComputedStyle(document.documentElement).getPropertyValue("--accent").trim().match(/^#[0-9a-f]{6}$/i) || [""])[0],
+      today: `${WD[t.getDay()]} ${iso(t)}`, days: Array.from({ length: 7 }, (_, i) => { const d = addDays(t, i + 1); return `${WD[d.getDay()].slice(0, 2)} ${iso(d)}`; }).join(", "),
+      done: items.filter((x) => x.done && x.doneAt && iso(new Date(x.doneAt)) === iso(t)).length,
+      tasks: open.map((x) => ({ t: x.title.slice(0, 90), due: x.due || "", time: x.time || "", list: listById[x.list]?.name || "", prio: x.prio })),
+      ids: open.map((x) => x.id),
+    };
+    location.href = `intent://ai?ctx=${b64u(JSON.stringify(c))}#Intent;scheme=erledigt;package=de.erledigt.app;end`;
+  }, true);
+  const aiq = qs.get("ai");
+  if (aiq) {
+    history.replaceState(null, "", location.pathname);
+    let tries = 40;
+    const go = () => {
+      if (!loaded) { if (tries-- > 0) setTimeout(go, 250); return; }
+      try { const { a, ids } = JSON.parse(unb64(aiq)); if (aiApply(a, ids, null)) { sfx.done?.(); showToast(a.typ === "neue_aufgabe" ? `Aufgabe „${a.titel}“ angelegt` : "Übernommen"); render(); } else showToast("Das ging nicht – Aufgabe nicht gefunden"); }
+      catch { showToast("Aktion vom Assistenten war unlesbar"); }
+    };
+    go();
+  }
 }
 
 })();

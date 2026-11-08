@@ -41,3 +41,5 @@ body.web { touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   body.web .task.sw-r { box-shadow: -400px 0 0 0 #16A34A inset; }
   body.web .task.sw-l { box-shadow: 400px 0 0 0 #DC2626 inset; }
 }
+/* Android-App mit Handy-KI: ✦-Knopf wieder zeigen */
+body.web.native-ai #ai-btn { display: grid !important; }
