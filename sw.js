@@ -1,5 +1,5 @@
 // AUTOMATISCH ERZEUGT (build/web.js). App-Hülle offline; Daten kommen immer live von Supabase.
-const V = "erledigt-web-2.8.3";
+const V = "erledigt-web-2.8.4";
 const SHELL = ["./", "index.html", "styles.css", "web.css", "app.js", "vendor/supabase.js", "vendor/fonts/bricolage-grotesque-latin-500-normal.woff2", "vendor/fonts/bricolage-grotesque-latin-700-normal.woff2", "vendor/fonts/bricolage-grotesque-latin-800-normal.woff2", "vendor/fonts/inter-latin-wght-normal.woff2", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", (e) => { self.skipWaiting(); e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL))); });
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim())));

@@ -1088,3 +1088,22 @@ body.has-scene .hero:has(.inbox:not([hidden])) { z-index: 40; }
 .ai-head button { transition: background .15s, transform .15s; } .ai-head button:hover { transform: translateY(-1px); }
 @media (prefers-reduced-motion: reduce) { .ai-glow, .ai-orb, .ai-msg, .ai-chips button, .ai-empty { animation: none !important; } }
 body.idle .ai-glow, body.idle .ai-orb { animation-play-state: paused !important; }
+
+/* ---------- Start: Logo zeichnet sich, Oberfläche blendet gestaffelt ein ---------- */
+#intro { position: fixed; inset: 0; z-index: 200; background: var(--bg); display: grid; place-items: center; transition: opacity .5s ease, visibility .5s; -webkit-app-region: drag; }
+#intro.out { opacity: 0; visibility: hidden; }
+#intro .lg { display: flex; flex-direction: column; align-items: center; gap: 18px; transform: translateY(-4vh); }
+#intro .mark { width: 96px; height: 96px; border-radius: 26px; display: grid; place-items: center; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #06B6D4)); box-shadow: 0 24px 60px color-mix(in srgb, var(--accent) 40%, transparent), 0 0 0 1px rgb(255 255 255 / .08) inset; animation: introMark .7s cubic-bezier(.2, .9, .2, 1.25) both; }
+#intro .mark svg path { stroke-dasharray: 32; stroke-dashoffset: 32; animation: introCheck .5s .38s cubic-bezier(.2, .8, .2, 1) forwards; }
+#intro b { font: 800 30px var(--display); letter-spacing: -.02em; color: var(--fg); opacity: 0; animation: introWord .6s .5s cubic-bezier(.2, .8, .2, 1) forwards; }
+@keyframes introMark { from { transform: scale(.55) rotate(-10deg); opacity: 0; } }
+@keyframes introCheck { to { stroke-dashoffset: 0; } }
+@keyframes introWord { from { opacity: 0; transform: translateY(10px); letter-spacing: .12em; } to { opacity: 1; } }
+body.boot .hero .sc { animation: bootScene 1.1s .85s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes bootScene { from { opacity: 0; transform: scale(1.05); } }
+body.boot .hero .hello, body.boot .hero-icons, body.boot nav > *, body.boot main > * { animation: bootFade .6s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes bootFade { from { opacity: 0; transform: translateY(12px); } }
+body.boot .hero .hello { animation-delay: 1.05s; } body.boot .hero-icons { animation-delay: 1.15s; }
+body.boot nav > :nth-child(1) { animation-delay: 1.1s; } body.boot nav > :nth-child(2) { animation-delay: 1.17s; } body.boot nav > :nth-child(3) { animation-delay: 1.24s; } body.boot nav > :nth-child(4) { animation-delay: 1.31s; } body.boot nav > :nth-child(5) { animation-delay: 1.38s; } body.boot nav > :nth-child(n+6) { animation-delay: 1.45s; }
+body.boot main > :nth-child(1) { animation-delay: 1.2s; } body.boot main > :nth-child(2) { animation-delay: 1.28s; } body.boot main > :nth-child(3) { animation-delay: 1.36s; } body.boot main > :nth-child(n+4) { animation-delay: 1.44s; }
+@media (prefers-reduced-motion: reduce) { #intro { display: none; } body.boot * { animation: none !important; } }

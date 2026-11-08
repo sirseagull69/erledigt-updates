@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.3 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.8.4 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1331,6 +1331,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.8.4": ["Schöner Start: Logo, Haken, dann blendet alles weich ein"],
   "2.8.3": ["Assistent sieht jetzt nach was aus: Orb, Glanz, sanfte Animationen"],
   "2.8.2": ["Neue Landschaft Fjord – nachts mit Nordlicht, das sich im Wasser spiegelt", "Einkaufen aufgeräumt: Korb, „Schnell rein“, Regale nur auf Tipp", "Dschungel ist raus"],
   "2.8.1": ["Dschungel: Fluss und überwachsener Tempel, weniger Papageien", "Unterwasser ohne Lichtstrahlen"],
@@ -4110,6 +4111,14 @@ async function settingsInit() {
 setInterval(() => { if (!uid || !loaded) return; if (setUid !== uid) settingsInit(); else settingsPush(); }, 2000);
 
 // ===== 10-start.js =====
+// Start-Animation: Logo zeichnet sich, dann blendet die Oberfläche gestaffelt ein (nicht im Mini-Fenster, nicht bei reduzierter Bewegung)
+{
+  const intro = $("intro");
+  if (intro) {
+    if (MINI || matchMedia("(prefers-reduced-motion: reduce)").matches) intro.remove();
+    else { document.body.classList.add("boot"); setTimeout(() => intro.classList.add("out"), 1050); setTimeout(() => intro.remove(), 1600); setTimeout(() => document.body.classList.remove("boot"), 2800); }
+  }
+}
 // Version + Updates
 if (!MINI) window.desktop?.version?.().then((v) => {
   $("ver").textContent = "Erledigt v" + v;
