@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.0 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.2 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -13,7 +13,10 @@ const LISTS = [ // alle Listen; welche in der Seitenleiste stehen, hängt vom Mo
 ];
 // ---------- Modus: Arbeit (Standard) oder Privat – im Design-Menü ----------
 function privMode() { try { return design.mode === "privat"; } catch { return false; } } // design kommt erst in Teil 04
-const MODE_LISTS = { arbeit: ["alle", "arbeit", "privat", "projekte"], privat: ["alle", "privat", "haushalt", "einkaufen", "termine"] };
+// Strikt getrennt: im Arbeitsmodus ist nichts Privates zu sehen (Listen, Zähler, Suche, Kalender, Planung, Assistent) – und umgekehrt.
+const MODE_LISTS = { arbeit: ["alle", "arbeit", "projekte"], privat: ["alle", "privat", "haushalt", "einkaufen", "termine"] };
+const modeHas = (l) => MODE_LISTS[privMode() ? "privat" : "arbeit"].includes(l);
+const inMode = (t) => modeHas(t.list);
 function shownLists() { const ids = MODE_LISTS[privMode() ? "privat" : "arbeit"]; return LISTS.filter((l) => ids.includes(l.id)); }
 const defList = () => (privMode() ? "privat" : "arbeit");
 const PRIOS = [
@@ -221,6 +224,7 @@ function addItem(p) {
   const id = "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const doc = { title: p.title, due: p.due, until: p.until || null, time: p.time || null, timeEnd: p.timeEnd || null, repeat: p.repeat || null, notes: p.notes || "", checklist: p.checklist || [], attachments: [], prio: p.prio || draftPrio, list: p.list || (list === "alle" ? defList() : list), done: false, doneAt: null, createdAt: Date.now() };
   selected = id;
+  if (!modeHas(doc.list)) { selected = null; setTimeout(() => showToast(`In „${listById[doc.list].name}“ abgelegt – im ${privMode() ? "Privat" : "Arbeits"}modus ausgeblendet`), 0); }
   write(() => col.doc(id).set(doc));
   if (!MINI) { const mm = memMatches(p.title, id); if (mm.length) setTimeout(() => showBadge("Kennst du schon", `${mm[0].t.title} (${memDate(mm[0].t)}): ${mm[0].t.solution}`, "bolt", true), 700); }
   return id;
@@ -254,6 +258,7 @@ function spawnNext(it) {
   spawned.add(it.id); try { localStorage.setItem("erledigt-spawned", JSON.stringify([...spawned].slice(-500))); } catch {}
   const base = addDays(new Date(Math.max(it.due ? parseIso(it.due) : 0, todayD())), 1);
   const next = iso(nextOcc(it.repeat, base));
+  if (items.some((x) => x.id !== it.id && !x.done && !x.archived && x.repeat === it.repeat && x.title === it.title && x.list === it.list && x.due && x.due >= next)) return; // gibt es schon
   const id = "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   write(() => col.doc(id).set({ title: it.title, due: next, time: it.time || null, timeEnd: it.timeEnd || null, repeat: it.repeat, prio: it.prio, list: it.list, notes: it.notes || "", checklist: (it.checklist || []).map((c) => ({ ...c, done: false })), attachments: [], done: false, doneAt: null, createdAt: Date.now() }));
   setTimeout(() => showBadge("Kommt wieder", `„${it.title}“ – nächstes Mal ${dueLabel(next)}${it.time ? " " + it.time : ""}`, "clock"), 500);
@@ -280,23 +285,27 @@ $("toast-undo").addEventListener("click", () => {
 
 // ---------- Ansicht ----------
 // „Alle“ im Arbeitsmodus ohne Einkaufszettel – Milch & Brot gehören nicht zwischen die Arbeitsaufgaben
-const inList = () => items.filter((t) => !t.archived && (list === "alle" ? !(t.list === "einkaufen" && !privMode()) : t.list === list));
+const inList = () => items.filter((t) => !t.archived && (list === "alle" ? inMode(t) : t.list === list));
 // Abschnitte der offenen Liste: Überfällig / Heute / Morgen / Diese Woche / Später / Ohne Datum
 const SECTIONS = ["Überfällig", "Heute", "Morgen", "Nächste 7 Tage", "Später", "Ohne Datum"];
+let secDays = { key: "" };
 function sectionOf(t) {
-  const today = iso(todayD());
+  const d0 = todayD(), key = +d0;
+  if (secDays.key !== key) secDays = { key, today: iso(d0), tomorrow: iso(addDays(d0, 1)), week: iso(addDays(d0, 7)) }; // Tagesgrenzen einmal pro Tag statt pro Vergleich
+  const { today, tomorrow, week } = secDays;
   if (!t.due) return { i: 5 };
   if (t.until && t.due <= today && t.until >= today) return { i: 1 };
   if (endDay(t) < today) return { i: 0 };
   if (t.due === today) return { i: 1 };
-  if (t.due === iso(addDays(todayD(), 1))) return { i: 2 };
-  if (t.due <= iso(addDays(todayD(), 7))) return { i: 3 };
+  if (t.due === tomorrow) return { i: 2 };
+  if (t.due <= week) return { i: 3 };
   return { i: 4 };
 }
 function visible() {
   const dueKey = (t) => t.due || "9999";
-  if (MINI) { const today = iso(todayD()); return items.filter((t) => !t.done && !t.archived && t.due && t.due <= today).sort((a, b) => (PRIO_RANK[a.prio] - PRIO_RANK[b.prio]) || ((a.time || "99") < (b.time || "99") ? -1 : 1)); }
-  const grp = filter === "offen" ? (t) => sectionOf(t).i : () => 0;
+  if (MINI) { const today = iso(todayD()); return items.filter((t) => !t.done && !t.archived && inMode(t) && t.due && t.due <= today).sort((a, b) => (PRIO_RANK[a.prio] - PRIO_RANK[b.prio]) || ((a.time || "99") < (b.time || "99") ? -1 : 1)); }
+  const secMemo = new Map();
+  const grp = filter === "offen" ? (t) => { let s = secMemo.get(t.id); if (s === undefined) secMemo.set(t.id, (s = sectionOf(t).i)); return s; } : () => 0;
   return inList()
     .filter((t) => filter === "alle" || (filter === "offen" ? !t.done : t.done))
     .sort((a, b) => (a.done - b.done) || (grp(a) - grp(b)) || (filter === "erledigt" ? (b.doneAt || 0) - (a.doneAt || 0) : 0) || (PRIO_RANK[a.prio] - PRIO_RANK[b.prio]) || (dueKey(a) < dueKey(b) ? -1 : dueKey(a) > dueKey(b) ? 1 : 0) || (a.createdAt - b.createdAt));
@@ -477,7 +486,7 @@ function render() {
 
   if (!shownLists().some((l) => l.id === list)) list = "alle";
   $("lists").innerHTML = `<div class="mode-seg" role="group" aria-label="Modus"><button type="button" data-mode="arbeit" aria-pressed="${!privMode()}">Arbeit</button><button type="button" data-mode="privat" aria-pressed="${privMode()}">Privat</button></div><span class="label">Listen</span>` + shownLists().map((l) => {
-    const open = items.filter((x) => !x.done && (l.id === "alle" || x.list === l.id)).length;
+    const open = items.filter((x) => !x.done && !x.archived && (l.id === "alle" ? inMode(x) : x.list === l.id)).length;
     const bump = loaded && lastCounts[l.id] !== undefined && lastCounts[l.id] !== open;
     lastCounts[l.id] = loaded ? open : undefined;
     return `<button type="button" data-list="${l.id}" aria-current="${list === l.id}"><span class="name"><span class="sq" style="background:${l.dot}"></span>${l.name}</span><span class="n${bump ? " bump" : ""}">${loaded ? open : ""}</span></button>`;
@@ -521,8 +530,9 @@ function render() {
       html = `<div class="empty"><b>Nichts zu tun hier.</b><span>${txt}</span></div>`;
     } else if (filter === "offen" && !MINI) {
       let last = -1;
-      html = vis.map((t) => {
-        const s = sectionOf(t).i, head = s !== last ? `<div class="sec-h${s === 0 ? " late" : ""}" role="heading" aria-level="3"><b>${SECTIONS[s]}</b><span>${vis.filter((x) => sectionOf(x).i === s).length}</span></div>` : "";
+      const secs = vis.map((t) => sectionOf(t).i), secN = {}; for (const s of secs) secN[s] = (secN[s] || 0) + 1;
+      html = vis.map((t, vi) => {
+        const s = secs[vi], head = s !== last ? `<div class="sec-h${s === 0 ? " late" : ""}" role="heading" aria-level="3"><b>${SECTIONS[s]}</b><span>${secN[s]}</span></div>` : "";
         last = s; return head + taskHtml(t);
       }).join("");
     } else html = vis.map(taskHtml).join("");
@@ -533,11 +543,16 @@ function render() {
     }
     seen = new Set(vis.map((t) => t.id));
   }
+  // Wird gerade ein Titel in der Liste umbenannt, darf Neu-Zeichnen (z. B. Sync von einem anderen Gerät) das Getippte nicht verwerfen
+  const edOld = editing && $("edit-" + editing), edKeep = edOld && document.activeElement === edOld ? { v: edOld.value, a: edOld.selectionStart, b: edOld.selectionEnd } : null;
+  if (edOld) edOld.dataset.cancel = "1"; // das alte Feld verschwindet gleich – sein focusout soll nichts speichern und den Bearbeiten-Zustand nicht beenden
+  const edId = editing;
   $("tasks").innerHTML = html;
+  editing = edId;
   updateFun();
   if (detailId) renderDetail();
 
-  if (editing) { const el = $("edit-" + editing); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }
+  if (editing) { const el = $("edit-" + editing); if (el) { if (edKeep) el.value = edKeep.v; el.focus(); if (edKeep) el.setSelectionRange(edKeep.a, edKeep.b); else el.setSelectionRange(el.value.length, el.value.length); } else editing = null; }
 }
 
 function updateHint() {
@@ -550,7 +565,7 @@ function updateHint() {
     return;
   }
   $("hint").classList.toggle("idle", !v.trim());
-  if (!v.trim()) { $("hint").innerHTML = `Tipp: <code>morgen 14:30</code> Erinnerung · <code>donnerstags</code> wiederholen · <code>!</code> hoch · ${privMode() ? "<code>#einkaufen</code>" : "<code>#privat</code>"} · <code>/</code> Vorlagen`; if (list === "einkaufen") $("hint").innerHTML = `<code>Milch, Brot, Eier</code> legt mehrere Artikel an · Kachel antippen = gekauft`; return; }
+  if (!v.trim()) { $("hint").innerHTML = `Tipp: <code>morgen 14:30</code> Erinnerung · <code>donnerstags</code> wiederholen · <code>!</code> hoch · ${privMode() ? "<code>#einkaufen</code>" : "<code>#projekte</code>"} · <code>/</code> Vorlagen`; if (list === "einkaufen") $("hint").innerHTML = `<code>Milch, Brot, Eier</code> legt mehrere Artikel an · Kachel antippen = gekauft`; return; }
   const p = parseInput(v);
   const bits = [listById[p.list || (list === "alle" ? defList() : list)].name, prioById[p.prio || draftPrio].name];
   if (p.due) bits.push(dueText(p));
@@ -598,10 +613,20 @@ $("tasks").addEventListener("click", (e) => {
   else if (act === "list") { const it = items.find((i) => i.id === id); const order = shownLists().map((l) => l.id).filter((x) => x !== "alle"); patch(id, { list: order[(order.indexOf(it.list) + 1) % order.length] }); }
   else if (act === "due") popFor = popFor === id ? null : id;
   else if (act === "edit") { editing = id; popFor = null; }
-  else if (act === "open") { openDetail(id); return; }
+  else if (act === "open") { lastOpenClick = { id, t: Date.now() }; openDetail(id); return; }
   render();
 });
 $("tasks").addEventListener("dblclick", (e) => { const t = e.target.closest('.title[data-act="open"]'); if (!t) return; closeDetail(); editing = t.closest(".task").dataset.id; popFor = null; render(); });
+// Doppelklick auf den Titel = umbenennen. Der erste Klick öffnet schon die Details, der zweite landet deshalb auf deren Hintergrund –
+// das Doppelklick-Ereignis kam nie beim Titel an (Umbenennen in der Liste ging gar nicht). Darum hier: Doppelklick kurz nach dem Öffnen zählt.
+let lastOpenClick = { id: null, t: 0 };
+document.addEventListener("dblclick", (e) => {
+  if (!matchMedia("(hover: hover)").matches || Date.now() - lastOpenClick.t > 600 || e.target.closest(".task")) return;
+  const id = lastOpenClick.id; lastOpenClick = { id: null, t: 0 };
+  if (!items.some((x) => x.id === id) || (detailId && detailId !== id)) return;
+  if (detailId) closeDetail();
+  editing = id; popFor = null; selected = id; render();
+});
 $("tasks").addEventListener("change", (e) => {
   if (e.target.type !== "date") return;
   if (e.target.id.startsWith("until-")) { const id = e.target.id.slice(6), it = items.find((x) => x.id === id), v = e.target.value; popFor = null; patch(id, { until: v && it?.due && v > it.due ? v : null }); render(); return; }
@@ -614,6 +639,7 @@ $("tasks").addEventListener("keydown", (e) => {
 });
 $("tasks").addEventListener("focusout", (e) => {
   if (!e.target.classList.contains("title-input")) return;
+  if (!e.target.isConnected) return; // Feld wurde beim Neu-Zeichnen ersetzt, nicht vom Nutzer verlassen
   const id = editing; editing = null;
   const v = e.target.value.trim(), it = items.find((i) => i.id === id);
   if (!e.target.dataset.cancel && it && v && v !== it.title) patch(id, { title: v });
@@ -623,7 +649,6 @@ document.addEventListener("click", (e) => { if (popFor && !e.target.closest(".po
 
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "f" && !MINI) { e.preventDefault(); openSearch(); return; }
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "j" && !MINI) { e.preventDefault(); toggleAi(); return; }
   if (!$("search").hidden) return;
   if (e.key === "Escape" && !$("tpl-menu").hidden) { $("tpl-menu").hidden = true; return; }
   if (e.key === "Escape" && detailId && !["INPUT", "TEXTAREA"].includes(e.target.tagName)) { closeDetail(); return; }
@@ -695,8 +720,8 @@ function markNotified(key) {
   for (const k in notified) if (notified[k] < cutoff) delete notified[k];
   try { localStorage.setItem(NKEY, JSON.stringify(notified)); } catch {}
 }
-function showReminder(title, sub, taskId) {
-  addNote({ kind: taskId ? "reminder" : "summary", ic: "bell", title, sub, taskId });
+function showReminder(title, sub, taskId, single) {
+  addNote({ kind: taskId || single ? "reminder" : "summary", ic: "bell", title, sub, taskId });
   const box = $("reminders");
   while (box.children.length >= 3) box.firstElementChild.remove();
   const el = document.createElement("div");
@@ -713,7 +738,7 @@ function showReminder(title, sub, taskId) {
   box.appendChild(el);
   if (wantNotify && canNotify()) {
     try {
-      const n = new Notification(title, { body: sub, tag: taskId || "summary", requireInteraction: !!taskId });
+      const n = new Notification(title, { body: sub, tag: taskId || (single ? "privat" : "summary"), requireInteraction: !!taskId });
       n.onclick = () => { window.desktop?.show(); window.focus(); if (taskId) { selected = taskId; render(); } n.close(); };
     } catch {}
   }
@@ -734,13 +759,18 @@ function checkReminders() {
     if (at <= now) {
       markNotified(key);
       // Nur frisch fällige melden (max. 15 Min her), nicht alles Alte beim ersten Öffnen nach Tagen
-      if (now - at < 15 * 60000) showReminder(t.title, (vorlauf ? `In ${vorlauf} Min um ${t.time}` : `Fällig um ${t.time}`) + ` · ${listById[t.list].name}`, t.id);
+      const missed = now - at >= 15 * 60000 && t.due === today; // PC schlief zur Erinnerungszeit: am selben Tag nachreichen statt verschlucken
+      if (now - at < 15 * 60000 || missed) {
+        const when = missed ? `Verpasst – war um ${t.time} fällig` : vorlauf ? `In ${vorlauf} Min um ${t.time}` : `Fällig um ${t.time}`;
+        if (inMode(t) || privMode()) showReminder(t.title, when + ` · ${listById[t.list].name}`, t.id);
+        else showReminder("Private Erinnerung", when + " · Details im Privat-Modus", null, true); // Titel bleibt bei der Arbeit verborgen
+      }
     }
   }
   // Einmal pro Tag ab 8 Uhr: Übersicht für heute
   const sumKey = "summary@" + today;
   if (!notified[sumKey] && now.getHours() >= 8) {
-    const open = items.filter((t) => !t.done && t.due);
+    const open = items.filter((t) => !t.done && !t.archived && t.due && inMode(t));
     const todayN = open.filter((t) => t.due === today).length, overN = open.filter((t) => endDay(t) < today).length;
     markNotified(sumKey);
     if (todayN || overN) showReminder(
@@ -1037,8 +1067,8 @@ $("today-card").addEventListener("click", (e) => { if (e.target.closest(".ring-t
 function renderToday() {
   if (!isWide()) return;
   const t = todayD(), today = iso(t);
-  const doneToday = items.filter((x) => x.done && x.doneAt && iso(new Date(x.doneAt)) === today).length;
-  const dueToday = items.filter((x) => !x.done && x.due && x.due <= today).length;
+  const doneToday = items.filter((x) => x.done && x.doneAt && inMode(x) && iso(new Date(x.doneAt)) === today).length;
+  const dueToday = items.filter((x) => !x.done && !x.archived && inMode(x) && x.due && x.due <= today).length;
   const st = loaded ? streakOf().n : 0;
   const html = `<div class="today-card${todayShown ? " static" : ""}">
     <div class="tc-top"><b>Heute</b><span>${WD[t.getDay()]}, ${t.getDate()}. ${MON[t.getMonth()]} · KW ${kw(t)}</span></div>
@@ -1078,7 +1108,7 @@ function openPlan() {
 }
 function renderPlan() {
   const today = iso(todayD());
-  const open = items.filter((t) => !t.done && !t.archived);
+  const open = items.filter((t) => !t.done && !t.archived && inMode(t));
   const late = open.filter((t) => t.due && endDay(t) < today).sort((a, b) => (a.due < b.due ? -1 : 1));
   const now = open.filter((t) => t.due === today).sort((a, b) => (a.time || "99") < (b.time || "99") ? -1 : 1);
   const none = open.filter((t) => !t.due).length;
@@ -1100,7 +1130,7 @@ $("plan-body").addEventListener("click", (e) => {
 });
 $("plan-all").addEventListener("click", () => {
   const today = iso(todayD());
-  items.filter((t) => !t.done && t.due && endDay(t) < today).forEach((t) => patch(t.id, { due: today }));
+  items.filter((t) => !t.done && !t.archived && inMode(t) && t.due && endDay(t) < today).forEach((t) => patch(t.id, { due: today }));
   setTimeout(renderPlan, 50);
 });
 $("plan-go").addEventListener("click", () => { $("plan-overlay").hidden = true; burst($("new"), 24, 2); });
@@ -1113,7 +1143,7 @@ $("plan-overlay").addEventListener("click", (e) => { if (e.target.id === "plan-o
 function weekStats(back = 0) {
   const t = todayD(), mon = addDays(t, -((t.getDay() + 6) % 7) - 7 * back);
   const keys = [...Array(7)].map((_, i) => iso(addDays(mon, i)));
-  const done = doneItems().filter((x) => { const k = iso(new Date(x.doneAt)); return k >= keys[0] && k <= keys[6]; });
+  const done = doneItems().filter(inMode).filter((x) => { const k = iso(new Date(x.doneAt)); return k >= keys[0] && k <= keys[6]; });
   return { mon, keys, per: keys.map((k) => done.filter((x) => iso(new Date(x.doneAt)) === k).length), done };
 }
 const weekId = () => { const s = weekStats(); return iso(s.mon); };
@@ -1125,7 +1155,7 @@ function openWeek() {
   const best = w.per.indexOf(Math.max(...w.per));
   const byList = LISTS.map((l) => l.id).filter((x) => x !== "alle").map((l) => [l, w.done.filter((x) => x.list === l).length]).filter((x) => x[1]);
   const hot = w.done.filter((x) => x.prio === "hoch").length;
-  const oldest = items.filter((x) => !x.done && !x.archived).sort((a, b) => a.createdAt - b.createdAt)[0];
+  const oldest = items.filter((x) => !x.done && !x.archived && inMode(x)).sort((a, b) => a.createdAt - b.createdAt)[0];
   const oldDays = oldest ? Math.floor((Date.now() - oldest.createdAt) / 864e5) : 0;
   const verdict = total === 0 ? "Ruhige Woche. Auch mal schön." : total < 5 ? "Solide Woche." : total < 15 ? "Starke Woche!" : "Maschine. Absolute Maschine.";
   const diff = total - lastTotal;
@@ -1180,7 +1210,7 @@ function maybeRituals() {
   const kPlan = "erledigt-plan-" + uid;
   if (store.get(kPlan, "") !== today && now.getHours() >= 5) {
     store.set(kPlan, today);
-    const open = items.filter((t) => !t.done && !t.archived && t.due && t.due <= iso(todayD()));
+    const open = items.filter((t) => !t.done && !t.archived && inMode(t) && t.due && t.due <= iso(todayD()));
     if (open.length) { openPlan(); return; }
   }
   const kWeek = "erledigt-week-" + uid;
@@ -1204,7 +1234,7 @@ function fokusRender() {
   if (!t || t.done) { endFokus(); return; }
   $("fokus-title").textContent = t.title;
   const cl = t.checklist || [], done = cl.filter((c) => c.done).length;
-  const next = items.filter((x) => !x.done && x.id !== t.id && x.due === iso(todayD()) && x.time).sort((a, b) => (a.time < b.time ? -1 : 1))[0];
+  const next = items.filter((x) => !x.done && inMode(x) && x.id !== t.id && x.due === iso(todayD()) && x.time).sort((a, b) => (a.time < b.time ? -1 : 1))[0];
   $("fokus-sub").textContent = [cl.length ? `☑ ${done} von ${cl.length} Unterpunkten` : "", next ? `Nächstes: ${next.title} um ${next.time}` : ""].filter(Boolean).join(" · ");
   const left = fokus.paused ? fokus.left : fokus.end - Date.now();
   $("fokus-time").textContent = fokusFmt(left);
@@ -1347,6 +1377,8 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.9.2": ["Ohne Verbindung geht nichts mehr verloren: Änderungen bleiben gespeichert und werden nachgeschickt, sobald das Netz wieder da ist", "Doppelklick auf einen Titel benennt wieder um – und Getipptes bleibt, auch wenn gerade ein anderes Gerät synchronisiert", "Verpasste Erinnerung (PC war im Ruhezustand) wird am selben Tag nachgereicht", "Der Assistent Origami (lokale KI) ist vorerst ausgebaut – die App ist dadurch deutlich kleiner"],
+  "2.9.1": ["Flüssiger, vor allem am Handy und Mac: Der Himmel pausiert, wenn ein Fenster offen ist oder du weiterscrollst", "Arbeit und Privat sind strikt getrennt – im Arbeitsmodus ist nichts Privates mehr zu sehen (Listen, Zähler, Suche, Kalender, Planung, Assistent)", "Fenster und Menüs sind am Handy und Mac deckend statt Milchglas – umstellbar unter Einstellungen → Extras → Glas-Effekt", "Handy: Wochenansicht mit Tagen untereinander, Erinnerungen unten, Tagesplanung lesbar, kein heller Streifen über dem Himmel"],
   "2.9.0": ["Großer Frühjahrsputz: schneller, sparsamer im Hintergrund, aufgeräumter Code", "Origami ist schlauer – mehr Gedächtnis, kürzere und passendere Anweisungen", "Handy: Listen als Pillen oben, Aufgaben sofort sichtbar, größere Tippflächen", "Fokus-Modus zeigt wieder Timer und Knöpfe", "Einkaufen: „gekauft“ lässt sich rückgängig machen", "Sicherheit: Assistenten-Links von außen werden ignoriert"],
   "2.8.9": ["Dein Assistent heißt jetzt Origami – mit eigenem Papiervogel, der beim Arbeiten fliegt"],
   "2.8.8": ["KI-Leistung jetzt in drei Stufen", "Beim Antworten siehst du Schritt für Schritt, was der Assistent gerade macht"],
@@ -1453,32 +1485,39 @@ const DEFAULT_DESIGN = { scene: "wald", mode: "arbeit", name: "", place: null, p
 design = Object.assign({}, DEFAULT_DESIGN, store.get("erledigt-design", {}));
 design.w = Object.assign({}, DEFAULT_DESIGN.w, design.w || {});
 function saveDesign() { store.set("erledigt-design", design); }
+// Glas-Effekt (durchscheinende Fenster mit Weichzeichner): kostet am Handy und Mac spürbar Leistung → dort aus, unter Windows an. Pro Gerät umstellbar (Einstellungen → Extras).
+function glassOn() { return typeof design.w.glass === "boolean" ? design.w.glass : !!window.desktop && window.desktop.platform !== "darwin"; }
 // Modus umschalten (Seitenleiste oder Design-Menü); gibt true zurück, wenn dafür die Einrichtung aufgeht
 function setAppMode(m) {
   m = m === "privat" ? "privat" : "arbeit";
   if (design.mode === m) return false;
   const first = m === "privat" && !design.name;
-  design.mode = m; designChanged(); lastTodayHtml = ""; lastDayHtml = null; renderDay(); updateHint();
+  design.mode = m;
+  { const cur = detailId && items.find((x) => x.id === detailId); if (cur && !inMode(cur)) closeDetail(); if (!$("search").hidden) closeSearch(); selected = null; popFor = null; } // nichts aus dem anderen Modus offen lassen
+  designChanged(); lastTodayHtml = ""; lastDayHtml = null; renderDay(); updateHint();
   if (first) { openSetup(); return true; }
   return false;
 }
 
 // App-Symbol (Fenster, Taskleiste, Infobereich) in der aktuellen Akzentfarbe zeichnen
 var iconKey = "", iconTimer = 0; // var: render() kann schon vor dieser Zeile laufen
-var tbKey = "";
-function syncTitlebar() {
+var tbKey = "", tbClear = null, tbCtx = null, tbHexMemo = {};
+// Farbe als #rrggbb für Windows – ein einziger Canvas, Ergebnisse gemerkt (vorher: drei neue Canvas pro Scroll-Ereignis)
+function tbHex(c) { tbHexMemo = tbHexMemo || {}; if (tbHexMemo[c]) return tbHexMemo[c]; tbCtx = tbCtx || document.createElement("canvas").getContext("2d"); tbCtx.fillStyle = "#000"; tbCtx.fillStyle = c; return (tbHexMemo[c] = tbCtx.fillStyle); }
+function syncTitlebar(fromScroll) {
   if (MINI || !window.desktop?.titlebar) return;
   document.body.classList.add("has-tb");
   if (window.desktop?.platform === "darwin") document.body.classList.add("mac");
   // Mit Himmel: Titelleiste durchsichtig, solange man oben ist – der Himmel geht bis an den Fensterrand
   const clear = document.body.classList.contains("has-scene") && scrollY < 60;
+  if (fromScroll === true && clear === tbClear) return; // beim Scrollen nur reagieren, wenn die 60-px-Grenze überschritten wird
+  tbClear = clear;
   document.body.classList.toggle("tb-clear", clear);
   const cs = getComputedStyle(document.body), bg = cs.getPropertyValue("--bg").trim() || "#121316", fg = cs.getPropertyValue("--fg").trim() || "#F5F3EF";
-  const toHex = (c) => { const x = document.createElement("canvas").getContext("2d"); x.fillStyle = c; return x.fillStyle; }; // Farbe als #rrggbb für Windows
-  const col = clear ? "#00000000" : toHex(bg), sym = clear ? "#FFFFFF" : toHex(fg), key = col + sym + bg;
-  if (key !== tbKey) { tbKey = key; window.desktop.titlebar(col, sym, toHex(bg)); }
+  const col = clear ? "#00000000" : tbHex(bg), sym = clear ? "#FFFFFF" : tbHex(fg), key = col + sym + bg;
+  if (key !== tbKey) { tbKey = key; window.desktop.titlebar(col, sym, tbHex(bg)); }
 }
-addEventListener("scroll", () => syncTitlebar(), { passive: true });
+addEventListener("scroll", () => syncTitlebar(true), { passive: true });
 function syncAppIcon() {
   syncTitlebar();
   if (MINI || !window.desktop?.setIcon) return;
@@ -1515,6 +1554,7 @@ function applyDesign() {
   const b = document.body.classList;
   b.toggle("arcade", !!p.force);
   b.toggle("soft", !!p.soft);
+  b.toggle("no-glass", !glassOn());
   if (sceneSync) sceneSync();
   const ni = document.getElementById("new"); if (ni) ni.placeholder = innerWidth < 520 ? (design.mode === "privat" ? "z. B. „Zahnarzt morgen 15 Uhr“" : "z. B. „VPN Peter morgen“") : design.mode === "privat" ? "Was steht an? z. B. „Zahnarzt anrufen morgen“" : "Was steht an? z. B. „VPN Peter prüfen morgen“";
 }
@@ -1540,7 +1580,7 @@ function renderDesign() {
       <button type="button" class="st-item" id="setup-open"><span class="st-l"><b>Name & Wetter-Ort</b><small>${esc(design.name || "kein Name")} · ${esc(weatherPlace().name)}</small></span>${chev}</button>
     </div>
     <h3 style="margin-top:14px">Erinnern vor dem Termin</h3>${opt("vorlauf", [[0, "Pünktlich"], [5, "5 Min"], [15, "15 Min"], [30, "30 Min"], [60, "1 Std"]], +(design.vorlauf || 0))}<small class="muted" style="display:block;margin-top:6px">Gilt am PC, Mac und Handy.</small></section>
-    <section class="st-sec"><h3>Extras</h3><div class="st-list">${tog("w.scene", "Himmel oben", "Landschaft mit echtem Wetter und Tageszeit", design.w.scene)}${design.w.scene ? tog("w.hoch", "Große Landschaft", "Hoch, mit Wiese und Bäumen vorne – aus: schmales Band wie früher", design.w.hoch !== false) : ""}${tog("sound", "Sounds", "Kleine Töne beim Abhaken", soundOn)}${tog("levels", "Level & XP", "Punkte und Erfolge fürs Erledigen", levelsOn)}</div></section>
+    <section class="st-sec"><h3>Extras</h3><div class="st-list">${tog("w.scene", "Himmel oben", "Landschaft mit echtem Wetter und Tageszeit", design.w.scene)}${design.w.scene ? tog("w.hoch", "Große Landschaft", "Hoch, mit Wiese und Bäumen vorne – aus: schmales Band wie früher", design.w.hoch !== false) : ""}${tog("w.glass", "Glas-Effekt", "Durchscheinende Fenster – schick, braucht aber mehr Leistung", glassOn())}${tog("sound", "Sounds", "Kleine Töne beim Abhaken", soundOn)}${tog("levels", "Level & XP", "Punkte und Erfolge fürs Erledigen", levelsOn)}</div></section>
     ${design.w.scene && window.__scene ? (() => { const st = window.__scene.skyTest.state(), row = (k, cur, list) => `<div class="opt-row" role="group">${list.map(([v, l]) => `<button type="button" data-sky-${k}="${v}" aria-pressed="${cur === v}">${l}</button>`).join("")}</div>`;
       return `<details class="ds-more st-sec"><summary>Himmel testen</summary>
       <h3>Wetter</h3>${row("w", st.weather, [["echt", "Echt"], ["sonne", "Sonne"], ["wolken", "Wolken"], ["regen", "Regen"], ["schnee", "Schnee"], ["gewitter", "Gewitter"], ["nebel", "Nebel"]])}
@@ -1573,7 +1613,8 @@ $("design-overlay").addEventListener("click", (e) => {
   const t = e.target.closest("[data-tog]");
   if (t) {
     const id = t.dataset.tog;
-    if (id.startsWith("w.")) design.w[id.slice(2)] = !design.w[id.slice(2)];
+    if (id === "w.glass") design.w.glass = !glassOn();
+    else if (id.startsWith("w.")) design.w[id.slice(2)] = !design.w[id.slice(2)];
     else if (id === "levels") { $("lvl-toggle").click(); }
     else if (id === "sound") { $("sound").click(); }
     else design[id] = !design[id];
@@ -1674,7 +1715,7 @@ function renderDetail(focusTitle) {
     </div>
     <div class="drawer-foot" id="d-foot">
       ${tplSaving ? `<input id="tpl-name" placeholder="Name der Vorlage" value="${esc(t.title.replace(/:.*$/, ""))}" aria-label="Name der Vorlage"><button type="button" data-d="tpl-save">Speichern</button><button type="button" data-d="tpl-cancel">Abbrechen</button>`
-        : `${/^Mail von [^\n]*<[^>@\s]+@[^>\s]+>/.test(t.notes || "") ? '<button type="button" data-d="reply">Antworten</button>' : ""}<button type="button" data-d="ai">Assistent fragen</button><button type="button" data-d="tpl">Als Vorlage speichern</button>${t.done ? "" : ''}<button type="button" class="danger" data-d="del">Löschen</button>`}
+        : `${/^Mail von [^\n]*<[^>@\s]+@[^>\s]+>/.test(t.notes || "") ? '<button type="button" data-d="reply">Antworten</button>' : ""}<button type="button" data-d="tpl">Als Vorlage speichern</button>${t.done ? "" : ''}<button type="button" class="danger" data-d="del">Löschen</button>`}
     </div>`;
   if (html !== lastDetailHtml) {
     lastDetailHtml = html; $("drawer").innerHTML = html;
@@ -1724,7 +1765,6 @@ $("drawer").addEventListener("click", (e) => {
   else if (a === "tpl") { tplSaving = true; lastDetailHtml = ""; renderDetail(); }
   else if (a === "tpl-cancel") { tplSaving = false; lastDetailHtml = ""; renderDetail(); }
   else if (a === "tpl-save") saveAsTemplate();
-  else if (a === "ai") openAi(t.id);
   else if (a === "reply") { const to = (t.notes.match(/^Mail von [^\n]*<([^>]+)>/) || [])[1]; if (to) window.open(`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent("AW: " + t.title)}`, "_blank"); }
   else if (a === "del") { const id = t.id; closeDetail(); deleteTask(id); }
 });
@@ -1864,8 +1904,8 @@ const mark = (s, q) => { const i = s.toLowerCase().indexOf(q); return i < 0 ? es
 function runSearch() {
   const q = $("search-in").value.trim().toLowerCase();
   let hits;
-  if (!q) hits = items.filter((t) => !t.done && !t.archived).sort((a, b) => b.createdAt - a.createdAt).slice(0, 8).map((t) => ({ t, where: "" }));
-  else hits = items.map((t) => {
+  if (!q) hits = items.filter((t) => !t.done && !t.archived && inMode(t)).sort((a, b) => b.createdAt - a.createdAt).slice(0, 8).map((t) => ({ t, where: "" }));
+  else hits = items.filter(inMode).map((t) => {
     let score = 0, where = "";
     const ti = t.title.toLowerCase().indexOf(q);
     if (ti >= 0) score += ti === 0 ? 100 : 60;
@@ -1967,6 +2007,12 @@ document.addEventListener("pointerup", (e) => {
   const day = col.dataset.day, it = items.find((x) => x.id === was);
   if (it && (it.due || "none") !== day) { patch(was, day === "none" ? { due: null, time: null } : { due: day }); sfx.done(); }
   render();
+});
+// Finger-Ziehen vom Browser abgebrochen (Seite scrollt stattdessen): aufräumen, sonst bleibt die Zieh-Marke am Bildschirm kleben
+document.addEventListener("pointercancel", () => {
+  if (!pd) return; const c = pd.c; pd = null; dragId = null;
+  dragGhost?.remove(); dragGhost = null; c.classList.remove("dragging"); document.body.classList.remove("dragging-ev");
+  document.querySelectorAll("#tasks .over").forEach((x) => x.classList.remove("over"));
 });
 document.addEventListener("click", (e) => { if (eatClick) { e.stopPropagation(); e.preventDefault(); eatClick = false; } }, true);
 $("view-seg").addEventListener("click", (e) => {
@@ -2115,11 +2161,43 @@ function applyLocal(id, body) {
   render();
 }
 const ok = ({ error }) => { if (error) throw error; setSync(true); };
+// ---------- Warteschlange für Änderungen ohne Verbindung ----------
+// Vorher: Änderung schlug fehl → nach 5 s wurde vom Server neu geladen und die Änderung war still weg (Handy im Funkloch, PC nach Ruhezustand).
+// Jetzt: Was wegen fehlender Verbindung nicht rausgeht, bleibt lokal sichtbar, wird gemerkt (übersteht auch Neustart) und der Reihe nach nachgeschickt.
+const OUTBOX_KEY = "erledigt-outbox";
+let outbox = store.get(OUTBOX_KEY, []); if (!Array.isArray(outbox)) outbox = [];
+let inflight = 0, writeSeq = 0, flushing = null;
+const saveOutbox = () => store.set(OUTBOX_KEY, outbox.slice(-500));
+const isNetErr = (e) => !!e && (!navigator.onLine || /fetch|network|load failed|timeout|abort/i.test(String(e.message || e)) || e.status === 0);
+const sendOp = (o) => (o.op === "upsert" ? sb.from("todos").upsert({ id: o.id, ...o.row }) : o.op === "update" ? sb.from("todos").update(o.row).eq("id", o.id) : sb.from("todos").delete().eq("id", o.id));
+async function runOp(o) {
+  writeSeq++;
+  if (outbox.length) { outbox.push(o); saveOutbox(); flushOutbox(); return; } // Reihenfolge wahren: erst das Ältere
+  inflight++;
+  let res; try { res = await sendOp(o); } catch (e) { res = { error: e }; } finally { inflight--; }
+  if (res.error && isNetErr(res.error)) { outbox.push(o); saveOutbox(); setSync(false); setStatus("Keine Verbindung – deine Änderungen bleiben hier gespeichert und werden nachgeschickt.", true); reloadSoon(); return; }
+  ok(res);
+}
+// true = alles draußen. Fehler, die nicht an der Verbindung liegen (z. B. Zeile gibt es nicht mehr), werden übersprungen statt ewig wiederholt.
+function flushOutbox() {
+  if (flushing) return flushing;
+  flushing = (async () => {
+    outbox = outbox.filter((o) => !o.uid || o.uid === uid);
+    while (outbox.length) {
+      let res; try { res = await sendOp(outbox[0]); } catch (e) { res = { error: e }; }
+      if (res.error && isNetErr(res.error)) { saveOutbox(); return false; }
+      if (res.error) console.warn("Änderung verworfen:", res.error.message || res.error);
+      outbox.shift(); saveOutbox();
+    }
+    return true;
+  })().finally(() => { flushing = null; });
+  return flushing;
+}
 col = {
   doc: (id) => ({
-    set: async (d) => { applyLocal(id, d); ok(await sb.from("todos").upsert({ id, ...toRow(d) })); },
-    update: async (p) => { applyLocal(id, p); ok(await sb.from("todos").update(toRow(p)).eq("id", id)); },
-    delete: async () => { applyLocal(id, null); ok(await sb.from("todos").delete().eq("id", id)); },
+    set: async (d) => { applyLocal(id, d); await runOp({ op: "upsert", id, row: toRow(d), uid }); },
+    update: async (p) => { applyLocal(id, p); await runOp({ op: "update", id, row: toRow(p), uid }); },
+    delete: async () => { applyLocal(id, null); await runOp({ op: "delete", id, uid }); },
   }),
 };
 
@@ -2128,8 +2206,14 @@ let reloadTimer = 0;
 function reloadSoon() { clearTimeout(reloadTimer); reloadTimer = setTimeout(fetchAll, 5000); }
 
 async function fetchAll() {
+  if (!uid) return;
+  // Erst Wartendes nachschicken – sonst würde der Serverstand die lokalen Änderungen überschreiben
+  if (outbox.length && !(await flushOutbox())) { setSync(false); setStatus(`Keine Verbindung – ${outbox.length} ${outbox.length === 1 ? "Änderung wartet" : "Änderungen warten"} und ${outbox.length === 1 ? "wird" : "werden"} nachgeschickt.`, true); reloadSoon(); if (!loaded && items.length) { loaded = true; render(); } return; }
+  const seq = writeSeq;
   const { data, error } = await sb.from("todos").select("*").order("created_at");
   if (error) { setSync(false); setStatus("Keine Verbindung zu Supabase. Neuer Versuch läuft …", true); reloadSoon(); return; }
+  // Während des Ladens wurde etwas geändert: Die Antwort kann schon veraltet sein (abgehakte Aufgabe spränge kurz zurück) → gleich noch einmal laden
+  if (seq !== writeSeq || inflight || outbox.length) { clearTimeout(reloadTimer); reloadTimer = setTimeout(fetchAll, 800); if (loaded) return; }
   items = data.map(fromRow);
   setSync(true); setStatus("");
   loaded = true; render(); checkReminders(); setTimeout(retroDates, 1500);
@@ -2195,465 +2279,9 @@ sb.auth.onAuthStateChange((event, s) => {
   if (was !== s.user.id) { setStatus(""); subscribe(); fetchAll(); }
 });
 
-// ===== 07-assistent.js =====
-// ======================================================================
-// ---------- 1.7: Assistent (lokale KI, eingebaut – optional auch Ollama) ----------
-// ======================================================================
-// ---------- Origami: Name, Vogel und Farben des Assistenten (Brand-Kit „Origami“) ----------
-// Sitzender Vogel = bereit, fliegender Vogel mit Flügelschlag = arbeitet. Farben: abendrot/indigo/wald/graphit nach App-Akzent.
-const ORI_SVG = (cls = "") => `<svg class="ori ${cls}" viewBox="0 0 100 100" aria-hidden="true"><g class="sit"><polygon class="d" points="18,64 8,50 32,60"/><polygon class="m" points="18,64 70,64 52,40"/><polygon class="h" points="36,51 61,52 40,12"/><polygon class="d" points="70,64 86,40 78,62"/><polygon class="s" points="86,40 96,45 84,47"/><polygon class="a" points="36,64 52,64 46,78"/></g><g class="fly"><polygon class="d wb" points="52,46 66,54 80,16"/><polygon class="d" points="16,60 6,48 30,56"/><polygon class="m" points="16,60 82,54 52,46"/><polygon class="h wf" points="52,46 66,54 34,10"/><polygon class="d" points="82,54 92,40 86,57"/><polygon class="s" points="92,40 99,44 90,46"/></g></svg>`;
-const ORI_PAL = { abendrot: ["#c2410c", "#ff8a4c", "#ffc9a8", "#e8590c", "#2d1a10"], indigo: ["#1e3a8a", "#4c6ef5", "#bac8ff", "#3b5bdb", "#0b1437"], wald: ["#1b5e3a", "#2f9e63", "#a7e8c0", "#2b8a57", "#0f2a1b"], graphit: ["#71717a", "#d4d4d8", "#ffffff", "#a1a1aa", "#fb923c"] };
-function oriPalette(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim()); if (!m) return "indigo";
-  const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
-  if (d < .12) return "graphit";
-  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360;
-  return h < 55 || h >= 330 ? "abendrot" : h < 175 ? "wald" : h < 290 ? "indigo" : "abendrot";
-}
-const oriVars = (p) => { const c = ORI_PAL[p] || ORI_PAL.indigo; return `--o-d:${c[0]};--o-m:${c[1]};--o-h:${c[2]};--o-a:${c[3]};--o-s:${c[4]}`; };
-const AI = window.desktop?.ai || null;
-const AI_MODELS = [
-  { id: "intern:qwen3-4b", name: "Empfohlen", size: "ca. 2,5 GB", note: "gute Texte, braucht ca. 4–5 GB freien RAM" },
-  { id: "intern:qwen2.5-1.5b", name: "Schnell", size: "ca. 1,1 GB", note: "für ältere PCs, Texte etwas einfacher" },
-];
-const AI_CHAT_KEY = "erledigt-ai-chat";
-let aiStatus = "unknown", aiErr = null, aiModels = [], aiPull = null, aiBusy = false, aiReq = 0, aiStream = "";
-let aiModel = store.get("erledigt-ai-model", null), aiCtx = null;
-let aiMsgs = store.get(AI_CHAT_KEY, []);
-// Leistung: „spar“ (Standard) schont den PC, „normal“ antwortet schneller
-let aiMode = store.get("erledigt-ai-mode", "spar");
-// Leistung in drei Stufen: wie viele Rechenkerne/Speicher die KI nimmt (main.js: AI_PROFILES)
-const AI_LEVELS = [
-  ["spar", "Sparsam", '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z"/><path d="M5 19 13 11"/></svg>'],
-  ["mittel", "Ausgewogen", '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 8h14M7 8l-3 7h6zM17 8l-3 7h6z"/></svg>'],
-  ["normal", "Volle Leistung", '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>'],
-];
-const AI_LEVEL_HINT = { spar: "Schont den PC – 2 Rechenkerne, wenig Speicher. Antworten dauern etwas länger.", mittel: "Guter Mittelweg – ein Drittel der Rechenkerne, PC bleibt flüssig.", normal: "Volle Leistung – halbe CPU und mehr Speicher, am schnellsten. Der PC wird kurz lauter." };
-AI?.mode?.(aiMode);
-const aiSave = () => store.set(AI_CHAT_KEY, aiMsgs.slice(-30));
-const SEND_IC = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
-const STOP_IC = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>';
-
-// Offene Aufgaben, durchnummeriert – die Nummern benutzt die KI für Aktionen
-function aiOpen() {
-  return items.filter((t) => !t.done && !t.archived)
-    .sort((a, b) => ((a.due || "9999") < (b.due || "9999") ? -1 : (a.due || "9999") > (b.due || "9999") ? 1 : PRIO_RANK[a.prio] - PRIO_RANK[b.prio]))
-    .slice(0, aiMode === "spar" ? 25 : aiMode === "mittel" ? 40 : 60);
-}
-function aiTaskLine(t, n) {
-  const cl = t.checklist || [];
-  return `[${n}] ${t.title} | ${t.due ? "fällig " + t.due + (t.time ? " " + t.time : "") : "ohne Datum"} | Prio ${t.prio} | ${listById[t.list].name}${t.repeat ? " | wiederkehrend" : ""}${cl.length ? ` | Unterpunkte ${cl.filter((c) => c.done).length}/${cl.length}` : ""}${t.notes ? " | Notiz: " + t.notes.replace(/\s+/g, " ").slice(0, aiMode === "spar" ? 60 : 140) : ""}`;
-}
-// Privat-Modus / anderer Name: Prompt umschreiben (kein IT-Support, kein Ritterwand)
+// ===== 07-nachfragen.js =====
+// Der Assistent „Origami“ (lokale KI) ist seit 2.9.2 ausgebaut – der Stand davor liegt in der Git-History (Tag/Commit 2.9.1).
 function userName() { try { return (design.name || "").trim() || "Nils"; } catch { return "Nils"; } }
-function aiSystem(open, q = "") {
-  let p = aiSystemWork(open, q);
-  const n = userName();
-  if (!privMode() && n === "Nils") return p;
-  if (privMode()) {
-    p = p.replace(/^Du bist Origami[^\n]*\n/, `Du bist Origami, der Assistent in „Erledigt“, der To-do-App von ${n}. Dein Name kommt vom gefalteten Papiervogel – du faltest große Aufgaben in kleine. ${n} nutzt die App privat: Haushalt, Einkaufen, Termine, Freizeit.\n`)
-      .replace("Kollegen bei Ritterwand duzen sich meist; sonst Sie.", "sonst Sie.")
-      .replace(/Beispiel – Nils:[^\n]*\n/, `Beispiel – ${n}: „Wie krieg ich die Wohnung bis Samstag sauber?“ – Du: kurze Liste (Do: Bad + Küche, Fr: Saugen + Wischen, Sa früh: Betten, Müll) und ein Aktionsblock „unterpunkte“.\n`);
-  }
-  return p.replace(/Nils/g, n);
-}
-// Systemanweisung: kurz halten (kleine Modelle werden mit langen Regelwerken dümmer) und nur die Regeln
-// mitschicken, die zur Frage passen – Mail-Regeln nur bei Mail-Fragen, Datei-Regeln nur bei Datei-Wünschen.
-function aiSystemWork(open, q = "") {
-  const t = todayD();
-  const days = Array.from({ length: 8 }, (_, i) => { const d = addDays(t, i); return `${WD[d.getDay()].slice(0, 2)} ${iso(d)}`; }).join(", ");
-  const doneToday = items.filter((x) => x.done && x.doneAt && iso(new Date(x.doneAt)) === iso(t)).length;
-  const ctxT = aiCtx && items.find((x) => x.id === aiCtx);
-  const wantsMail = /mail|antwort|antworte|schreib (ihm|ihr|dem|der)|AW:|betreff/i.test(q) || /^Mail von /.test(ctxT?.notes || "");
-  const wantsFile = /html|webseite|seite bau|datei|skript|script|tabelle|csv|markdown|\bmd\b|powershell|ps1|code|json|vorlage|checkliste als/i.test(q);
-  const lists = shownLists().filter((l) => l.id !== "alle").map((l) => l.id).join("|");
-  let p = `Du bist Origami, der Assistent in „Erledigt“, der To-do-App von Nils (IT-Support bei Ritterwand). Dein Name kommt vom Papiervogel – du faltest große Aufgaben in kleine Schritte.
-Heute: ${WD[t.getDay()]} ${iso(t)}. Nächste Tage: ${days}. Heute erledigt: ${doneToday}.
-
-Art: ehrlich, warm, kurz, mitdenkend wie ein guter Kollege. Sag klar, was du denkst – auch Unbequemes („Das schaffst du heute nicht alles, schieb X“). Trockener Humor erlaubt, höchstens ein Emoji. Keine Floskeln („Gerne!“, „Ich hoffe, das hilft“). Erfinde nichts; wenn du es nicht weißt, sag das.
-Antworte auf Deutsch, du-Form, ohne Gruß und ohne Unterschrift. Beantworte genau die Frage. Listen mit „- “. Fehlt Wichtiges: höchstens zwei kurze Rückfragen.
-`;
-  if (wantsMail) p += `
-MAIL (nur weil danach gefragt): erste Zeile „Betreff: …“ (Antwort: „AW: “ + alter Betreff), Leerzeile, 2–4 kurze Sätze, dann „Viele Grüße“ und „Nils“. Nichts versprechen, was Nils nicht gesagt hat. Duzt der Absender Nils → du + „Hallo <Vorname>,“; Kollegen bei Ritterwand duzen sich meist; sonst Sie. Eine weitergeleitete Nachricht an Nils ist Info für ihn – dann keine Mail, sondern eine passende Aufgabe vorschlagen.
-`;
-  else p += `Schreib KEINE Mail und kein „Betreff:“, außer Nils fragt ausdrücklich danach.
-`;
-  if (wantsFile) p += `
-DATEI: ein kurzer Satz, dann die KOMPLETTE Datei in EINEM Codeblock mit Sprache (\`\`\`html, \`\`\`md, \`\`\`csv, \`\`\`ps1 …), danach höchstens ein Satz. Die App zeigt den Block als Datei mit Vorschau. HTML: vollständig mit <title> und eigenem <style>, keine externen Links; Aufklapp-Elemente mit <details><summary>.
-`;
-  p += `
-AUFGABEN ÄNDERN geht nur per Aktionsblock am Ende – Nils bestätigt per Klick. Behaupte nie, du hättest etwas geändert. Ein Block pro Aktion, nur bekannte Felder:
-\`\`\`aktion
-{"typ":"neue_aufgabe","titel":"…","datum":"JJJJ-MM-TT","uhrzeit":"HH:MM","prio":"hoch|mittel|niedrig","liste":"${lists}","unterpunkte":["…"]}
-\`\`\`
-Weitere: {"typ":"verschieben","nr":3,"datum":"JJJJ-MM-TT"} · {"typ":"erledigt","nr":3} · {"typ":"unterpunkte","nr":3,"punkte":["…"]} · {"typ":"notiz","nr":3,"text":"…"}. „nr“ = Nummer aus der Liste unten, nie erfinden.
-`;
-  if (!wantsMail && !wantsFile) p += `
-Beispiel – Nils: „Wie teste ich das WLAN in der Kantine?“ – Du: kurze Liste mit 3–4 konkreten Schritten und darunter ein Aktionsblock „unterpunkte“ für die passende Aufgabe.
-`;
-  return p + `
-Offene Aufgaben:
-${open.length ? open.map((x, i) => aiTaskLine(x, i + 1)).join("\n") : "(keine)"}`;
-}
-
-// ---- Antwort zerlegen: Text + Aktionsblöcke ----
-function aiParse(text) {
-  const acts = [];
-  const clean = text.replace(/```(?:aktion|json)?\s*\n?([\s\S]*?)```/gi, (m, body) => {
-    const j = (() => { try { return JSON.parse(body.trim()); } catch { return null; } })();
-    const list = Array.isArray(j) ? j : j ? [j] : [];
-    const ok = list.filter((a) => a && typeof a === "object" && (a.typ || a.type));
-    if (!ok.length) return m;
-    acts.push(...ok.map((a) => ({ ...a, typ: String(a.typ || a.type) })));
-    return "";
-  });
-  return { text: clean.trim(), acts };
-}
-// Codeblöcke werden zu Datei-Karten (wie bei Claude): Name, Zeilen, Vorschau/Kopieren/Speichern.
-// Während der Antwort noch läuft, steht die Karte im Zustand „wird geschrieben …“, bis der Block zu ist.
-const AI_FILE = { html: ["html", "Webseite"], htm: ["html", "Webseite"], css: ["css", "Stylesheet"], js: ["js", "Skript"], javascript: ["js", "Skript"], ts: ["ts", "Skript"], py: ["py", "Python"], python: ["py", "Python"], json: ["json", "Daten"], csv: ["csv", "Tabelle"], md: ["md", "Text"], markdown: ["md", "Text"], sql: ["sql", "Abfrage"], ps1: ["ps1", "PowerShell"], powershell: ["ps1", "PowerShell"], bat: ["bat", "Batch"], cmd: ["bat", "Batch"], sh: ["sh", "Shell"], bash: ["sh", "Shell"], xml: ["xml", "XML"], yaml: ["yml", "YAML"], yml: ["yml", "YAML"], txt: ["txt", "Text"] };
-const aiFiles = [];
-function aiFileName(lang, code) {
-  const [ext] = AI_FILE[lang] || [/^\s*</.test(code) ? "html" : "txt"];
-  const t = (code.match(/<title>([^<]{2,60})<\/title>/i) || [])[1];
-  const base = (t || ({ html: "seite", css: "stil", js: "skript", py: "skript", json: "daten", csv: "tabelle", md: "notiz", sql: "abfrage", ps1: "skript", bat: "skript", sh: "skript", yml: "config", xml: "daten" }[ext] || "datei")).toLowerCase().replace(/[äöüß]/g, (c) => ({ ä: "ae", ö: "oe", ü: "ue", ß: "ss" }[c])).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "datei";
-  return `${base}.${ext}`;
-}
-function aiFileCard(lang, code, open) {
-  lang = (lang || "").toLowerCase(); code = code.replace(/\n$/, "");
-  const name = aiFileName(lang, code), ext = name.split(".").pop(), kind = (AI_FILE[lang] || AI_FILE[ext] || ["", "Datei"])[1], lines = code ? code.split("\n").length : 0;
-  if (open) return `<div class="ai-file writing" style="--ph:-${(Date.now() % 800) / 1000}s"><span class="fi">${esc(ext.toUpperCase())}</span><div class="fm"><b>${esc(name)}</b><small>wird geschrieben … ${lines} ${lines === 1 ? "Zeile" : "Zeilen"}</small></div><span class="spin"></span></div>`;
-  const id = aiFiles.push({ name, code, ext }) - 1;
-  return `<div class="ai-file" data-file="${id}"><span class="fi">${esc(ext.toUpperCase())}</span><div class="fm"><b>${esc(name)}</b><small>${esc(kind)} · ${lines} ${lines === 1 ? "Zeile" : "Zeilen"}</small></div><div class="fa"><button type="button" data-fview>Vorschau</button><button type="button" data-fcode>Code</button><button type="button" data-fcopy>Kopieren</button><button type="button" data-fsave>Speichern</button></div><pre hidden>${esc(code)}</pre></div>`;
-}
-function aiMd(s, final) {
-  const parts = s.split(/```([\w-]*)\n?([\s\S]*?)(```|$)/g);
-  const out = [];
-  for (let i = 0; i < parts.length; i += 4) {
-    const p = parts[i] || "";
-    out.push(aiMdText(p));
-    if (i + 1 < parts.length && parts[i + 1] !== "aktion") out.push(aiFileCard(parts[i + 1], parts[i + 2] || "", !final && parts[i + 3] !== "```"));
-  }
-  return out.join("");
-}
-function aiMdText(p) {
-  return [p].map((p) => {
-    return p.trim().split(/\n{2,}/).filter(Boolean).map((block) => {
-      const lines = block.split("\n");
-      const inline = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
-      if (lines.every((l) => /^\s*([-*•]|\d+\.)\s+/.test(l))) return `<ul>${lines.map((l) => `<li>${inline(l.replace(/^\s*([-*•]|\d+\.)\s+/, ""))}</li>`).join("")}</ul>`;
-      if (/^#{1,3}\s/.test(lines[0]) && lines.length === 1) return `<h5>${inline(lines[0].replace(/^#+\s*/, ""))}</h5>`;
-      return `<p>${lines.map(inline).join("<br>")}</p>`;
-    }).join("");
-  }).join("");
-}
-const okDate = (d) => (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(parseIso(d)) ? d : null);
-const okTime = (t) => (typeof t === "string" && /^([01]?\d|2[0-3]):[0-5]\d$/.test(t) ? t.padStart(5, "0") : null);
-const arr = (x) => (Array.isArray(x) ? x : typeof x === "string" ? x.split(/\n|;/) : []).map((s) => String(s).trim()).filter(Boolean).slice(0, 20);
-// Nummer → Aufgabe (Stand beim Fragen); ohne Nummer gilt die Aufgabe, auf die sich die Frage bezog
-function aiTarget(a, ids, ctx) { const n = parseInt(a.nr, 10); const id = n ? ids?.[n - 1] : ctx; return id ? items.find((t) => t.id === id) : null; }
-function aiDescribe(a, ids, ctx) {
-  const t = aiTarget(a, ids, ctx);
-  const tt = t ? `„${t.title}“` : null;
-  switch (a.typ) {
-    case "neue_aufgabe": { const d = okDate(a.datum); return { h: "Neue Aufgabe", s: `${a.titel || "?"}${d ? " · " + dueLabel(d) : ""}${okTime(a.uhrzeit) ? " " + okTime(a.uhrzeit) : ""}${prioById[a.prio] ? " · " + prioById[a.prio].name : ""}${arr(a.unterpunkte).length ? ` · ${arr(a.unterpunkte).length} Unterpunkte` : ""}`, ok: !!String(a.titel || "").trim() }; }
-    case "verschieben": return { h: "Verschieben", s: `${tt || "?"} → ${okDate(a.datum) ? dueLabel(a.datum) : "?"}`, ok: !!(t && okDate(a.datum)) };
-    case "erledigt": return { h: "Abhaken", s: tt || "?", ok: !!t };
-    case "unterpunkte": return { h: "Unterpunkte", s: `${tt || "?"}: ${arr(a.punkte).join(", ")}`, ok: !!(t && arr(a.punkte).length) };
-    case "notiz": return { h: "Notiz", s: `${tt || "?"}: ${String(a.text || "").slice(0, 120)}`, ok: !!(t && a.text) };
-    default: return { h: a.typ, s: "Unbekannte Aktion", ok: false };
-  }
-}
-function aiApply(a, ids, ctx) {
-  const t = aiTarget(a, ids, ctx);
-  if (a.typ === "neue_aufgabe") {
-    addItem({ title: String(a.titel).trim().slice(0, 300), due: okDate(a.datum), time: okTime(a.uhrzeit), prio: prioById[a.prio] ? a.prio : "mittel", list: listById[a.liste] && a.liste !== "alle" ? a.liste : defList(), checklist: arr(a.unterpunkte).map((x) => ({ id: rid(), text: x.slice(0, 300), done: false })) });
-  } else if (!t) return false;
-  else if (a.typ === "verschieben") patch(t.id, { due: okDate(a.datum) });
-  else if (a.typ === "erledigt") completeTask(t.id);
-  else if (a.typ === "unterpunkte") patch(t.id, { checklist: [...(t.checklist || []), ...arr(a.punkte).map((x) => ({ id: rid(), text: x.slice(0, 300), done: false }))] });
-  else if (a.typ === "notiz") patch(t.id, { notes: (t.notes ? t.notes + "\n\n" : "") + String(a.text).slice(0, 4000) });
-  return true;
-}
-
-// Vorschau einer HTML-Datei in einem abgeschotteten Rahmen (Skripte ja, Zugriff auf die App nein)
-function aiPreview(f) {
-  const ov = document.createElement("div"); ov.className = "overlay ai-prev";
-  // HTML läuft im Rahmen; Markdown wird gesetzt, CSV als Tabelle, JSON hübsch eingerückt, alles andere als Code
-  let inner;
-  if (f.ext === "html" || f.ext === "svg") inner = `<iframe sandbox="allow-scripts allow-forms" title="Vorschau"></iframe>`;
-  else if (f.ext === "md" || f.ext === "txt") inner = `<div class="ai-prev-doc">${aiMdText(f.code)}</div>`;
-  else if (f.ext === "csv") { const sep = (f.code.split("\n")[0].match(/;/g) || []).length > (f.code.split("\n")[0].match(/,/g) || []).length ? ";" : ","; const rows = f.code.trim().split("\n").map((r) => r.split(sep)); inner = `<div class="ai-prev-doc"><table>${rows.map((r, i) => `<tr>${r.map((c) => i ? `<td>${esc(c.replace(/^"|"$/g, ""))}</td>` : `<th>${esc(c.replace(/^"|"$/g, ""))}</th>`).join("")}</tr>`).join("")}</table></div>`; }
-  else { let c = f.code; if (f.ext === "json") { try { c = JSON.stringify(JSON.parse(c), null, 2); } catch {} } inner = `<pre class="ai-prev-code">${esc(c)}</pre>`; }
-  ov.innerHTML = `<div class="ai-prev-box"><header><span class="fi">${esc(f.ext.toUpperCase())}</span><b>${esc(f.name)}</b><button type="button" class="x" aria-label="Schließen">×</button></header>${inner}</div>`;
-  const fr = ov.querySelector("iframe"); if (fr) fr.srcdoc = f.code;
-  const close = () => ov.remove();
-  ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest(".x")) close(); });
-  document.addEventListener("keydown", function k(e) { if (e.key === "Escape") { close(); document.removeEventListener("keydown", k, true); e.stopPropagation(); } }, true);
-  document.body.appendChild(ov);
-}
-
-// ---- Oberfläche ----
-function aiShell() {
-  $("ai").innerHTML = `
-    <div class="ai-head">
-      ${ORI_SVG("idle")}
-      <div class="t"><b class="ori-name">Origami</b><small id="ai-state"><i></i>prüfe …</small></div>
-      <select id="ai-model" aria-label="Modell" hidden></select>
-      <button type="button" id="ai-new" title="Neuer Chat">Neu</button>
-      <button type="button" class="x" id="ai-close" aria-label="Schließen (Esc)">×</button>
-    </div>
-    <div class="ai-perf" id="ai-perf" data-mode="spar"><div class="ai-seg" id="ai-seg" role="radiogroup" aria-label="Leistung"><span class="ai-seg-pill" aria-hidden="true"></span>${AI_LEVELS.map(([m, l, ic]) => `<button type="button" role="radio" data-mode="${m}" aria-checked="false">${ic}<span>${l}</span></button>`).join("")}</div><small id="ai-perf-hint"></small></div>
-    <div class="ai-body" id="ai-body"></div>
-    <div class="ai-ctx" id="ai-ctx" hidden></div>
-    <div class="ai-chips" id="ai-chips"></div>
-    <div class="ai-foot"><textarea id="ai-in" rows="1" placeholder="Frag Origami …" aria-label="Nachricht an Origami"></textarea><button type="button" id="ai-send" aria-label="Senden">${SEND_IC}</button></div>`;
-}
-const aiReady = () => aiStatus === "ok" && aiModel && aiModels.some((m) => m.name === aiModel);
-function aiChips() {
-  const host = $("ai-chips"); if (host) host.hidden = aiMsgs.length > 0 || aiBusy;
-  const t = aiCtx && items.find((x) => x.id === aiCtx);
-  const list = t
-    ? (/^Mail von /.test(t.notes || "") ? ["Schreib eine Antwort auf die Mail", "Was will der von mir?", "Schlag mir Unterpunkte vor"] : ["Schlag mir Unterpunkte vor", "Schreib eine Mail dazu", "Wie fange ich am besten an?"])
-    : ["Was steht heute an?", "Was kann ich schieben?", "Schreib mir eine Mail …", "Hilf mir priorisieren"];
-  $("ai-chips").innerHTML = list.map((x) => `<button type="button" data-chip="${esc(x)}">${esc(x)}</button>`).join("") + '<button type="button" data-ai="claude" title="Frage samt Aufgaben an claude.ai übergeben (Cloud)">In Claude öffnen ↗</button>';
-  $("ai-ctx").hidden = !t;
-  $("ai-ctx").innerHTML = t ? `Zur Aufgabe <b>${esc(t.title)}</b><button type="button" id="ai-ctx-x" aria-label="Bezug entfernen">×</button>` : "";
-}
-function aiRenderPerf() {
-  const p = $("ai-perf"); if (!p) return;
-  p.dataset.mode = aiMode;
-  const i = Math.max(0, AI_LEVELS.findIndex(([m]) => m === aiMode));
-  p.style.setProperty("--seg", i);
-  p.querySelectorAll("[data-mode]").forEach((b) => b.tagName === "BUTTON" && b.setAttribute("aria-checked", String(b.dataset.mode === aiMode)));
-  $("ai-perf-hint").textContent = AI_LEVEL_HINT[aiMode] || "";
-}
-function aiSetMode(m) {
-  if (!AI_LEVELS.some(([x]) => x === m)) return;
-  if (m === aiMode) { aiRenderPerf(); return; }
-  aiMode = m; store.set("erledigt-ai-mode", aiMode); AI?.mode?.(aiMode); aiWarmKey = "";
-  aiRenderPerf();
-  const p = $("ai-perf"); if (p) { p.classList.remove("bump"); void p.offsetWidth; p.classList.add("bump"); }
-}
-function aiSegInit() {
-  const g = $("ai-seg"); if (!g) return;
-  g.addEventListener("click", (e) => { const b = e.target.closest("button[data-mode]"); if (b) aiSetMode(b.dataset.mode); });
-  g.addEventListener("keydown", (e) => {
-    const i = AI_LEVELS.findIndex(([m]) => m === aiMode);
-    if (e.key === "ArrowRight") { e.preventDefault(); aiSetMode(AI_LEVELS[Math.min(2, i + 1)][0]); g.querySelector(`[data-mode="${aiMode}"]`)?.focus(); }
-    if (e.key === "ArrowLeft") { e.preventDefault(); aiSetMode(AI_LEVELS[Math.max(0, i - 1)][0]); g.querySelector(`[data-mode="${aiMode}"]`)?.focus(); }
-  });
-  aiRenderPerf();
-}
-function aiRenderHead() {
-  const st = $("ai-state"); if (!st) return;
-  aiRenderPerf();
-  st.innerHTML = aiStatus === "ok" ? (aiReady() ? `<i class="ok"></i>läuft lokal auf deinem PC` : `<i></i>Modell fehlt noch`) : aiStatus === "off" ? `<i></i>KI startet nicht` : `<i></i>prüfe …`;
-  const sel = $("ai-model");
-  sel.hidden = !(aiStatus === "ok" && aiModels.length > 1);
-  sel.innerHTML = aiModels.map((m) => `<option value="${esc(m.name)}"${m.name === aiModel ? " selected" : ""}>${esc(m.label || m.name)}</option>`).join("");
-  $("ai-in").placeholder = aiReady() ? "Frag Origami – oder lass dir eine Mail schreiben …" : "Frage eingeben – Enter öffnet sie in Claude";
-  $("ai-send").innerHTML = aiBusy ? STOP_IC : SEND_IC;
-  $("ai-send").setAttribute("aria-label", aiBusy ? "Stopp" : "Senden");
-}
-function aiMsgHtml(m, i) {
-  if (m.role === "user") return `<div class="ai-msg user">${m.ctxTitle ? `<small class="ai-ctxlbl">zu „${esc(m.ctxTitle)}“</small>` : ""}${esc(m.show || m.content)}</div>`;
-  if (m.err) return `<div class="ai-msg bot err">${esc(m.content)}</div>`;
-  const { text, acts } = aiParse(m.content);
-  return `<div class="ai-msg bot" data-i="${i}">${aiMd(text, true) || "<p>…</p>"}${acts.map((a, k) => {
-    const d = aiDescribe(a, m.ids, m.ctx), done = m.applied?.[k];
-    return `<div class="ai-act${done ? " done" : ""}${d.ok ? "" : " bad"}"><div class="tx"><b>${esc(d.h)}</b>${esc(d.s)}</div>${d.ok ? `<button type="button" data-apply="${k}"${done ? " disabled" : ""}>${done ? "Erledigt ✓" : "Übernehmen"}</button>` : ""}</div>`;
-  }).join("")}<div class="tools"><button type="button" data-copy>Kopieren</button>${/^\s*Betreff:/im.test(text) ? '<button type="button" data-mail>Als Mail öffnen</button>' : ""}</div></div>`;
-}
-function aiRenderBody() {
-  $("ai")?.classList.toggle("busy", aiBusy);
-  const b = $("ai-body"); if (!b) return;
-  aiRenderHead(); aiChips();
-  if (aiStatus === "unknown") { b.innerHTML = '<div class="ai-empty">Suche die lokale KI …</div>'; return; }
-  if (aiStatus === "off") {
-    b.innerHTML = `<div class="ai-setup"><h3>KI startet nicht</h3>
-      <span>Die eingebaute KI ließ sich auf diesem PC nicht starten${aiErr ? `:<br><small>${esc(aiErr)}</small>` : "."}</span>
-      <div class="row"><button type="button" data-ai="recheck">Erneut prüfen</button></div></div>
-      <div class="ai-setup"><span>Ohne Einrichtung geht's auch: <b>In Claude öffnen</b> schickt deine Frage samt Aufgaben an claude.ai (dein Abo, läuft aber in der Cloud).</span><div class="row"><button type="button" class="sec" data-ai="claude">In Claude öffnen</button></div></div>`;
-    return;
-  }
-  if (!aiReady()) {
-    b.innerHTML = `<div class="ai-setup"><h3>Einmal einrichten</h3><span>Der Assistent läuft komplett auf deinem PC – kostenlos, deine Aufgaben gehen nirgendwo hin. Dafür einmal ein Sprachmodell laden, danach geht's auch offline:</span>
-      ${AI_MODELS.map((m) => `<div class="ai-model"><div><b>${m.name}</b> · ${esc(m.id)}<small>${m.size} · ${m.note}</small></div>${aiModels.some((x) => x.name === m.id) ? `<button type="button" data-use="${esc(m.id)}">Nutzen</button>` : `<button type="button" data-pull="${esc(m.id)}"${aiPull ? " disabled" : ""}>${aiPull?.model === m.id ? "lädt …" : "Laden"}</button>`}</div>`).join("")}
-      ${aiPull ? `<div class="ai-prog"><div style="width:${aiPull.pct}%"></div></div><small>${esc(aiPull.text)}</small>` : ""}
-      ${aiModels.length ? `<span>Schon vorhanden: ${aiModels.map((m) => `<a href="#" data-use="${esc(m.name)}">${esc(m.label || m.name)}</a>`).join(", ")}</span>` : ""}</div>
-      <div class="ai-setup"><span>Solange kein Modell da ist: <b>In Claude öffnen</b> schickt deine Frage samt Aufgaben an claude.ai (dein Abo, läuft aber in der Cloud).</span><div class="row"><button type="button" class="sec" data-ai="claude">In Claude öffnen</button></div></div>`;
-    return;
-  }
-  const msgs = aiMsgs.map(aiMsgHtml).join("");
-  const streaming = aiBusy ? `<div class="ai-msg bot" id="ai-live">${aiStream ? aiMd(aiParse(aiStream).text) : ""}${aiWork()}</div>` : "";
-  b.innerHTML = msgs || streaming ? msgs + streaming : `<div class="ai-empty">${ORI_SVG("big idle")}<b>Hi, ich bin Origami.</b>Ich kenne deine offenen Aufgaben, schreibe Mails und Dateien und lege Aufgaben an – du bestätigst per Klick. Alles bleibt auf deinem PC.</div>`;
-  b.scrollTop = b.scrollHeight;
-}
-async function aiCheck() {
-  if (!AI) { aiStatus = "off"; aiRenderBody(); return; }
-  const r = await AI.status();
-  aiStatus = r.ok ? "ok" : "off"; aiModels = r.models || []; aiErr = r.engineError || null;
-  if (r.ok && (!aiModel || !aiModels.some((m) => m.name === aiModel))) {
-    const pref = AI_MODELS.map((m) => m.id).find((id) => aiModels.some((m) => m.name === id)) || aiModels[0]?.name || null;
-    if (pref) { aiModel = pref; store.set("erledigt-ai-model", aiModel); }
-  }
-  aiRenderBody();
-  aiWarm();
-}
-let aiWarmKey = "";
-function aiWarm() {
-  if (!aiReady() || !aiModel.startsWith("intern:") || aiBusy) return;
-  const sys = aiSystem(aiOpen()), key = aiModel + sys;
-  if (key === aiWarmKey) return;
-  aiWarmKey = key;
-  AI.warm(aiModel, sys).then((r) => { if (!r?.ok) aiWarmKey = ""; });
-}
-function openAi(ctxId, prompt) {
-  if (MINI) return;
-  if (detailId) closeDetail();
-  if ($("ai").hidden) { $("ai").style.cssText = oriVars(oriPalette(getComputedStyle(document.documentElement).getPropertyValue("--accent"))); aiShell(); aiSegInit(); $("ai").hidden = false; $("ai-btn").classList.add("on"); }
-  if (ctxId !== undefined) aiCtx = ctxId;
-  aiRenderBody(); aiCheck();
-  if (prompt) { $("ai-in").value = prompt; }
-  setTimeout(() => $("ai-in")?.focus(), 60);
-}
-function closeAi() { AI?.release(); aiWarmKey = ""; $("ai").hidden = true; $("ai").innerHTML = ""; $("ai-btn").classList.remove("on"); }
-const toggleAi = () => ($("ai").hidden ? openAi() : closeAi());
-
-function aiUserText(raw) {
-  const t = aiCtx && items.find((x) => x.id === aiCtx);
-  if (!t) return raw;
-  const n = aiOpen().findIndex((x) => x.id === t.id) + 1;
-  return `Zur Aufgabe ${n ? `[${n}] ` : ""}„${t.title}“${t.checklist?.length ? ` (Unterpunkte: ${t.checklist.map((c) => c.text).join(", ")})` : ""}${t.notes ? ` (Notiz: ${t.notes.slice(0, /^Mail von /.test(t.notes) ? 2500 : 300)})` : ""}${mailBody(t.id) ? ` (Voller Mailtext: ${mailBody(t.id).slice(0, 2500)})` : ""}${(() => { const mm = memMatches(t.title, t.id); return mm.length ? ` (Früher so gelöst: ${mm.map((m) => `„${m.t.title}“ → ${m.t.solution}`).join("; ")})` : ""; })()}: ${raw}`;
-}
-async function aiSend(raw) {
-  raw = (raw || "").trim();
-  if (!raw || aiBusy) return;
-  if (!aiReady()) { await aiCheck(); if (!aiReady()) return; }
-  const open = aiOpen();
-  const ctxT = aiCtx && items.find((x) => x.id === aiCtx);
-  aiMsgs.push({ role: "user", content: aiUserText(raw), show: raw, ctxTitle: ctxT ? ctxT.title : "", t: Date.now() });
-  aiSave();
-  aiBusy = true; aiStream = ""; aiPhase = ""; const req = ++aiReq;
-  aiT0 = Date.now(); aiSawLoad = false; aiNTasks = open.length; clearInterval(aiTick); aiTick = setInterval(() => { const t = $("ai-work-t"); if (t) t.textContent = aiTime(); }, 1000);
-  aiRenderBody();
-  // Verlauf schlank halten: alte Dateien nur als Platzhalter, und nur so viel, wie in den Kontext passt
-  const budget = { spar: 5000, mittel: 11000, normal: 18000 }[aiMode] || 5000;
-  const all = aiMsgs.filter((m) => !m.err).map((m, i, arr) => ({ role: m.role, content: i < arr.length - 2 ? m.content.replace(/```([\w-]*)\n?([\s\S]*?)```/g, (x, l, c) => l === "aktion" ? "" : `[Datei ${aiFileName((l || "").toLowerCase(), c)} · ${c.split("\n").length} Zeilen]`) : m.content }));
-  const history = []; let used = 0;
-  for (let i = all.length - 1; i >= 0 && history.length < 12; i--) { used += all[i].content.length; if (used > budget && history.length) break; history.unshift(all[i]); }
-  const r = await AI.chat(aiModel, [{ role: "system", content: aiSystem(open, raw) }, ...history], req);
-  if (req !== aiReq) return;
-  aiBusy = false; clearInterval(aiTick);
-  const text = (r.text || aiStream || "").trim();
-  if (text) aiMsgs.push({ role: "assistant", content: text, ids: open.map((x) => x.id), ctx: aiCtx || null, t: Date.now() });
-  if (!r.ok && r.error !== "abgebrochen") aiMsgs.push({ role: "assistant", err: true, content: "Hat nicht geklappt: " + (r.error || "unbekannter Fehler") + ".", t: Date.now() });
-  aiStream = ""; aiSave(); aiRenderBody();
-  if (!r.ok) aiCheck();
-}
-let aiPhase = "";
-let aiT0 = 0, aiTick = 0;
-// Was die KI gerade tut – als kleine Schrittliste (erledigt ✓ / läuft ◌), dazu die Zeit
-let aiSawLoad = false, aiNTasks = 0;
-function aiSteps() {
-  const st = [{ t: `${aiNTasks} offene ${aiNTasks === 1 ? "Aufgabe" : "Aufgaben"} gelesen`, done: true }];
-  if (aiSawLoad) st.push({ t: aiPhase === "load" ? "Lädt das Modell in den Speicher …" : "Modell geladen", done: aiPhase !== "load" });
-  if (aiPhase === "load") return st;
-  if (!aiStream) { st.push({ t: aiCtx ? "Denkt über die Aufgabe nach …" : "Denkt nach …", done: false }); return st; }
-  st.push({ t: "Nachgedacht", done: true });
-  const parts = aiStream.split(/```([\w-]*)\n?([\s\S]*?)(```|$)/g);
-  let words = 0;
-  for (let i = 0; i < parts.length; i += 4) {
-    words += (parts[i] || "").trim().split(/\s+/).filter(Boolean).length;
-    if (i + 1 >= parts.length) continue;
-    const lang = parts[i + 1], code = parts[i + 2] || "", closed = parts[i + 3] === "```", lines = code ? code.replace(/\n$/, "").split("\n").length : 0;
-    if (lang === "aktion") { let typ = ""; try { typ = JSON.parse(code).typ; } catch {} const h = { neue_aufgabe: "neue Aufgabe", verschieben: "verschieben", erledigt: "abhaken", unterpunkte: "Unterpunkte", notiz: "Notiz" }[typ] || "Aktion"; st.push({ t: closed ? `Vorschlag vorbereitet: ${h}` : `Bereitet Vorschlag vor: ${h} …`, done: closed }); }
-    else { const n = aiFileName((lang || "").toLowerCase(), code); st.push({ t: closed ? `Datei ${n} erstellt · ${lines} Zeilen` : `Schreibt Datei ${n} · ${lines} Zeilen …`, done: closed }); }
-  }
-  const last = parts.length % 4 === 1 ? parts[parts.length - 1] : "";
-  if ((aiStream.match(/```/g) || []).length % 2 === 0) st.push({ t: `Schreibt Antwort · ${words} ${words === 1 ? "Wort" : "Wörter"} …`, done: false, last });
-  return st;
-}
-const aiTime = () => { const sec = Math.max(0, Math.round((Date.now() - aiT0) / 1000)); return sec < 60 ? sec + " Sek." : Math.floor(sec / 60) + " Min. " + (sec % 60) + " Sek."; };
-const aiWork = () => `<div class="ai-work" id="ai-work" style="--ph:-${(Date.now() % 1400) / 1000}s;--ph2:-${(Date.now() % 800) / 1000}s"><div class="ai-work-h">${ORI_SVG("flying mini")}<b>Origami arbeitet</b><span id="ai-work-t">${aiTime()}</span></div><ol>${aiSteps().map((x) => `<li class="${x.done ? "ok" : "run"}"><i></i>${esc(x.t)}</li>`).join("")}</ol></div>`;
-AI?.onChunk(({ reqId, text, phase }) => {
-  if (reqId !== aiReq || !aiBusy) return;
-  if (phase) aiPhase = phase; if (phase === "load") aiSawLoad = true;
-  aiStream = text;
-  // höchstens einmal pro Frame neu zeichnen; nur mitscrollen, wenn man unten ist (sonst kann man nicht zurücklesen)
-  if (aiFrame) return;
-  aiFrame = requestAnimationFrame(() => {
-    aiFrame = 0;
-    const el = $("ai-live"); if (!el || !aiBusy) return;
-    const b = $("ai-body"), stick = b.scrollHeight - b.scrollTop - b.clientHeight < 80;
-    el.innerHTML = aiMd(aiParse(aiStream).text) + aiWork();
-    if (stick) b.scrollTop = b.scrollHeight;
-  });
-});
-let aiFrame = 0;
-AI?.onPull((p) => {
-  if (!aiPull) return;
-  const pct = p.total ? Math.round((p.completed || 0) / p.total * 100) : aiPull.pct;
-  aiPull = { ...aiPull, pct, text: p.status === "success" ? "fertig" : `lädt${p.total ? ` · ${((p.completed || 0) / 1e9).toFixed(2).replace(".", ",")} von ${(p.total / 1e9).toFixed(2).replace(".", ",")} GB` : " …"}` };
-  const bar = document.querySelector(".ai-prog div"); if (bar) { bar.style.width = pct + "%"; bar.parentElement.nextElementSibling.textContent = aiPull.text; }
-});
-async function aiDoPull(model) {
-  aiPull = { model, pct: 0, text: "starte …" }; aiRenderBody();
-  const r = await AI.pull(model);
-  aiPull = null;
-  if (r.ok) { aiModel = model; store.set("erledigt-ai-model", model); showBadge("KI ist bereit", "Das Modell ist da – frag los. Die erste Antwort dauert ein paar Sekunden länger.", "star"); }
-  else showBadge("Download hat nicht geklappt", String(r.error || "").slice(0, 120), "bell", true);
-  aiCheck();
-}
-// Frage samt Aufgaben an claude.ai übergeben (läuft über das normale Abo, aber in der Cloud)
-function openInClaude(raw) {
-  const open = aiOpen().slice(0, 30);
-  const q = `${aiUserText(raw || "Hilf mir, meinen Tag zu sortieren.")}\n\n(Kontext: Ich bin ${userName()}${privMode() ? "" : ", IT-Support"}. Heute ist ${WD[todayD().getDay()]}, ${iso(todayD())}. Meine offenen Aufgaben:\n${open.map((x, i) => aiTaskLine(x, i + 1)).join("\n")})`;
-  window.open("https://claude.ai/new?q=" + encodeURIComponent(q.slice(0, 6000)), "_blank");
-}
-
-$("ai-btn").addEventListener("click", toggleAi);
-$("ai").addEventListener("click", (e) => {
-  const el = e.target.closest("button, a[data-use]"); if (!el) return;
-  if (el.id === "ai-close") return closeAi();
-  if (el.dataset.mode) { aiSetMode(el.dataset.mode); return; }
-  if (el.id === "ai-new") { if (aiBusy) AI?.stop(); aiBusy = false; aiReq++; aiMsgs = []; aiCtx = null; aiSave(); aiRenderBody(); $("ai-in").focus(); return; }
-  if (el.id === "ai-ctx-x") { aiCtx = null; aiChips(); return; }
-  if (el.id === "ai-send") { if (aiBusy) { AI?.stop(); return; } const v = $("ai-in").value; if (!aiReady()) { if (v.trim()) openInClaude(v); return; } $("ai-in").value = ""; aiSend(v); return; }
-  if (el.dataset.chip) { const c = el.dataset.chip; if (c.endsWith("…")) { $("ai-in").value = c.replace(" …", " an "); $("ai-in").focus(); } else if (aiReady()) aiSend(c); else openInClaude(c); return; }
-  if (el.dataset.ai === "recheck") { aiStatus = "unknown"; aiRenderBody(); aiCheck(); return; }
-  if (el.dataset.ai === "claude") { openInClaude($("ai-in").value); return; }
-  if (el.dataset.pull) return aiDoPull(el.dataset.pull);
-  if (el.dataset.use) { e.preventDefault(); aiModel = el.dataset.use; store.set("erledigt-ai-model", aiModel); aiRenderBody(); return; }
-  const fc = el.closest(".ai-file[data-file]");
-  if (fc) { const f = aiFiles[+fc.dataset.file]; if (!f) return;
-    if (el.dataset.fcode !== undefined) { const pre = fc.querySelector("pre"); pre.hidden = !pre.hidden; el.textContent = pre.hidden ? "Code" : "Code zu"; return; }
-    if (el.dataset.fcopy !== undefined) { navigator.clipboard.writeText(f.code).then(() => { el.textContent = "Kopiert ✓"; setTimeout(() => (el.textContent = "Kopieren"), 1500); }).catch(() => {}); return; }
-    if (el.dataset.fsave !== undefined) { const u = URL.createObjectURL(new Blob([f.code], { type: f.ext === "html" ? "text/html" : "text/plain" })); const a = document.createElement("a"); a.href = u; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); el.textContent = "Gespeichert ✓"; setTimeout(() => (el.textContent = "Speichern"), 1800); return; }
-    if (el.dataset.fview !== undefined) { aiPreview(f); return; }
-    return;
-  }
-  const msgEl = el.closest(".ai-msg[data-i]"); if (!msgEl) return;
-  const m = aiMsgs[+msgEl.dataset.i]; if (!m) return;
-  if (el.dataset.apply !== undefined) {
-    const k = +el.dataset.apply, a = aiParse(m.content).acts[k];
-    if (a && !m.applied?.[k] && aiApply(a, m.ids, m.ctx)) { m.applied = { ...(m.applied || {}), [k]: true }; aiSave(); sfx.done?.(); burst(el, 14, 1); aiRenderBody(); }
-  } else if (el.dataset.copy !== undefined) {
-    navigator.clipboard.writeText(aiParse(m.content).text).then(() => { el.textContent = "Kopiert ✓"; setTimeout(() => (el.textContent = "Kopieren"), 1500); }).catch(() => {});
-  } else if (el.dataset.mail !== undefined) {
-    const txt = aiParse(m.content).text.replace(/^[\s\S]*?(?=^\s*Betreff:)/im, "");
-    const sub = (txt.match(/^\s*Betreff:\s*(.*)$/im) || [])[1] || "";
-    const body = txt.replace(/^\s*Betreff:.*\n?/im, "").trim();
-    window.open(`mailto:?subject=${encodeURIComponent(sub)}&body=${encodeURIComponent(body)}`, "_blank");
-  }
-});
-$("ai").addEventListener("change", (e) => { if (e.target.id === "ai-model") { aiModel = e.target.value; store.set("erledigt-ai-model", aiModel); aiRenderHead(); } });
-$("ai").addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { e.stopPropagation(); closeAi(); return; }
-  if (e.target.id === "ai-in" && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("ai-send").click(); }
-});
-
 // ======================================================================
 // ---------- 1.7: Nachfragen von selbst (ohne KI) ----------
 // ======================================================================
@@ -2663,7 +2291,7 @@ function nudgeCandidate() {
   const today = iso(todayD()), now = Date.now();
   const log = store.get(NUDGE_KEY, { day: "", n: 0, last: 0, seen: {} });
   const fresh = (t) => !(log.seen[t.id] && now - log.seen[t.id] < 7 * 864e5);
-  const open = items.filter((t) => !t.done && !t.archived && !t.repeat && fresh(t));
+  const open = items.filter((t) => !t.done && !t.archived && inMode(t) && !t.repeat && fresh(t));
   const late = open.filter((t) => t.due && dayDiff(t.due, today) >= 3).sort((a, b) => (a.due < b.due ? -1 : 1))[0];
   if (late) return { t: late, kind: "late", n: dayDiff(late.due, today) };
   const stale = open.filter((t) => !t.due && t.createdAt && now - t.createdAt > 10 * 864e5).sort((a, b) => a.createdAt - b.createdAt)[0];
@@ -2698,7 +2326,7 @@ function showNudge({ t, kind, n }) {
     if (cur) {
       if (a === "today") patch(t.id, { due: iso(todayD()) });
       if (a === "week") { const d = todayD(); patch(t.id, { due: iso(addDays(d, ((8 - d.getDay()) % 7) || 7)) }); }
-      if (a === "split") { if (aiReady()) { openAi(t.id); aiSend("Schlag mir Unterpunkte vor, damit ich das endlich erledigt kriege."); } else openDetail(t.id); }
+      if (a === "split") openDetail(t.id); // Unterpunkte im Detail anlegen
       if (a === "del") deleteTask(t.id);
     }
     el.remove();
@@ -2708,7 +2336,6 @@ function showNudge({ t, kind, n }) {
 if (!MINI) {
   setTimeout(() => maybeNudge(), 4 * 60000);
   setInterval(() => maybeNudge(), 30 * 60000);
-  setTimeout(() => AI && AI.status().then((r) => { aiStatus = r.ok ? "ok" : "off"; aiModels = r.models || []; }), 3000);
 }
 
 // ===== 08-mail.js =====
@@ -2776,37 +2403,9 @@ function createFromMail(m) {
   const id = addItem({ title, due: mailDue(body) || iso(todayD()), list: "arbeit", prio: "mittel", notes });
   mailBodySet(id, body);
   showBadge("Aus Mail angelegt", title, "inbox", true);
-  aiMailTitle(id, title, m, body, notes, head);
   sfx.done?.();
   setTimeout(() => openDetail(id), 250);
   return id;
-}
-async function aiPickModel() {
-  if (!AI) return null;
-  const pick = () => (aiStatus !== "ok" ? null : aiModel && aiModels.some((m) => m.name === aiModel) ? aiModel : aiModels[0]?.name || null);
-  if (aiStatus === "ok" && pick()) return pick();
-  try { const r = await AI.status(); aiStatus = r.ok ? "ok" : "off"; aiModels = r.models || []; } catch {}
-  if (!aiModel) aiModel = store.get("erledigt-ai-model", null);
-  return pick();
-}
-// Titel aus dem Inhalt statt nur dem Betreff – macht die lokale KI, falls geladen
-async function aiMailTitle(id, title, m, body, notes, head) {
-  const model = await aiPickModel(); if (!model) return;
-  const t = todayD();
-  const sys = `Du formulierst für Nils (IT-Support) aus einer E-Mail einen kurzen Aufgabentitel: Was genau soll er tun? Höchstens 8 Wörter, Deutsch, keine Anführungszeichen, kein Datum. Nenne die Person, wenn es um ihr Gerät/Postfach/Konto geht.
-Dazu eine Kurzfassung der Mail in EINEM Satz (höchstens 20 Wörter), ohne Telefonnummern, Adressen oder Passwörter.
-Antworte NUR mit JSON: {"titel": "…", "kurz": "…"}`;
-  const c = await AI.classify(model, sys, `Von: ${m.from || ""}\nBetreff: ${m.subject || ""}\n\n${String(body).slice(0, 1400)}`).catch(() => null);
-  if (model.startsWith("intern:")) AI.release();
-  let j = null; try { j = JSON.parse((c?.text || "").match(/\{[\s\S]*\}/)?.[0] || "null"); } catch {}
-  const nt = typeof j?.titel === "string" ? j.titel.replace(/["„“]/g, "").trim().slice(0, 120) : "";
-  const kurz = typeof j?.kurz === "string" ? j.kurz.replace(/\s+/g, " ").trim().slice(0, 200) : "";
-  const cur = items.find((x) => x.id === id);
-  if (!cur) return;
-  const p = {};
-  if (nt && cur.title === title) p.title = nt;
-  if (kurz && cur.notes === notes) p.notes = (head ? head + "\n\n" : "") + kurz;
-  if (Object.keys(p).length) { patch(id, p); if (detailId === id) { lastDetailHtml = ""; setTimeout(renderDetail, 50); } }
 }
 // ---- Voller Mailtext nur lokal (localStorage dieses PCs), max. 300 Mails / 90 Tage ----
 const MB_KEY = "erledigt-mailbodies";
@@ -2889,7 +2488,7 @@ function memTokens(s) {
 }
 var memCache = { key: "", list: [] };
 function memIndex() {
-  const done = items.filter((t) => t.done && (t.solution || "").trim());
+  const done = items.filter((t) => t.done && inMode(t) && (t.solution || "").trim()); // frühere Lösungen nur aus dem aktuellen Modus
   const key = done.map((t) => t.id + (t.solution || "").length).join("|");
   if (key !== memCache.key) memCache = { key, list: done.map((t) => ({ t, tok: memTokens(t.title + " " + (t.checklist || []).map((c) => c.text).join(" ")) })) };
   return memCache.list;
@@ -2949,7 +2548,7 @@ function repSpan(kind) {
 function kwOf(d) { const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - day); const y = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return Math.ceil(((x - y) / 864e5 + 1) / 7); }
 function repItems() {
   const [a, b] = repSpan(repRange);
-  return items.filter((t) => t.done && t.doneAt && t.doneAt >= +a && t.doneAt < +b && t.list !== "privat").sort((p, q) => p.doneAt - q.doneAt);
+  return items.filter((t) => t.done && t.doneAt && t.doneAt >= +a && t.doneAt < +b && inMode(t)).sort((p, q) => p.doneAt - q.doneAt);
 }
 const repWho = (t) => (t.notes || "").match(/^Mail von ([^<\n·]+)/)?.[1]?.trim() || "";
 function repPlain() {
@@ -2965,41 +2564,11 @@ function renderRep() {
   $("rep-seg").innerHTML = [["heute", "Heute"], ["woche", "Diese Woche"], ["vorwoche", "Letzte Woche"], ["monat", "Monat"]].map(([k, l]) => `<button type="button" data-r="${k}" aria-pressed="${repRange === k}">${l}</button>`).join("");
   $("rep-n").textContent = `${n} erledigte Aufgabe${n === 1 ? "" : "n"} (ohne Privat)`;
   if (!repBusy) $("rep-out").value = repPlain();
-  $("rep-ai").hidden = !n; $("rep-ai").disabled = repBusy; $("rep-ai").textContent = repBusy ? "KI sortiert …" : "Nach Themen sortieren (KI)";
 }
 function openRep() { $("rep-overlay").hidden = false; repBusy = false; renderRep(); }
-// KI darf NUR sortieren (Nummern → Themen). Der Text kommt immer aus den echten Aufgaben → nichts erfunden.
-async function repAi() {
-  const list = repItems();
-  if (list.length < 4) { showBadge("Zu wenig zum Zusammenfassen", "Bei so wenigen Aufgaben ist die Liste schon kurz genug.", "bolt", true); return; }
-  const model = await aiPickModel();
-  if (!model) { showBadge("Keine KI geladen", "Im Assistenten (Strg+J) einmal ein Modell laden – oder die Liste so nehmen.", "bolt", true); return; }
-  repBusy = true; renderRep();
-  const sys = `Sortiere die nummerierten IT-Aufgaben in 2 bis 6 Themen (z. B. Drucker, Benutzer & Konten, Hardware, Netzwerk, Software & Updates, Projekte, Sonstiges).
-Jede Nummer genau einmal. Erfinde keine Nummern.
-Antworte NUR mit JSON: {"themen": [{"name": "Thema", "nr": [1, 2]}]}`;
-  const c = await AI.classify(model, sys, list.slice(0, 60).map((t, i) => `${i + 1}. ${t.title}${t.solution ? " – " + t.solution : ""}`).join("\n"), 600).catch(() => null);
-  if (model.startsWith("intern:")) AI.release();
-  repBusy = false; renderRep();
-  let j = null; try { j = JSON.parse((c?.text || "").match(/\{[\s\S]*\}/)?.[0] || "null"); } catch {}
-  if (!Array.isArray(j?.themen)) { showBadge("KI hat's nicht sortiert bekommen", "Die normale Liste bleibt stehen.", "bolt", true); return; }
-  const used = new Set(), groups = [];
-  for (const g of j.themen) {
-    const ts = [];
-    for (const raw of Array.isArray(g?.nr) ? g.nr : []) { const n = parseInt(raw, 10); if (n >= 1 && n <= list.length && !used.has(n)) { used.add(n); ts.push(n); } }
-    if (ts.length) groups.push({ name: String(g.name || "Sonstiges").slice(0, 40), ts: ts.map((n) => list[n - 1]) });
-  }
-  const rest = list.filter((_, i) => !used.has(i + 1));
-  if (rest.length) { const s2 = groups.find((g) => /sonstig/i.test(g.name)); s2 ? s2.ts.push(...rest) : groups.push({ name: "Sonstiges", ts: rest }); }
-  const [, , label] = repSpan(repRange);
-  const one = (t) => `• ${t.title}${repWho(t) ? ` (für ${repWho(t)})` : ""}${t.solution ? ` – ${t.solution}` : ""}`;
-  groups.sort((p, q) => q.ts.length - p.ts.length);
-  $("rep-out").value = `IT – erledigt ${label} (${list.length} Aufgaben)\n\n` + groups.map((g) => `${g.name} (${g.ts.length})\n${g.ts.map(one).join("\n")}`).join("\n\n");
-}
 $("rep-overlay").addEventListener("click", (e) => {
   if (e.target.id === "rep-overlay" || e.target.closest("#rep-close")) { $("rep-overlay").hidden = true; repBusy = false; return; }
   const r = e.target.closest("[data-r]"); if (r && !repBusy) { repRange = r.dataset.r; renderRep(); return; }
-  if (e.target.closest("#rep-ai")) { repAi(); return; }
   if (e.target.closest("#rep-copy")) { navigator.clipboard.writeText($("rep-out").value).then(() => { $("rep-copy").textContent = "Kopiert ✓"; setTimeout(() => ($("rep-copy").textContent = "Kopieren"), 1500); }).catch(() => {}); return; }
   if (e.target.closest("#rep-mail")) { const v = $("rep-out").value; window.open(`mailto:?subject=${encodeURIComponent(v.split("\n")[0])}&body=${encodeURIComponent(v.split("\n").slice(1).join("\n").trim())}`, "_blank"); }
 });
@@ -3809,7 +3378,7 @@ function fxSize() {
   if (Math.round(r.width) !== fx.w || Math.round(r.height) !== fx.h || dpr !== fx.dpr) { fx.w = Math.round(r.width); fx.h = Math.round(r.height); fx.dpr = dpr; fxc.width = fx.w * dpr; fxc.height = fx.h * dpr; fx.parts = []; }
   return true;
 }
-const fxActive = () => on && TH !== "wasser" && (W.rain || W.snow || W.storm) && !document.hidden && !reduce.matches && !document.body.classList.contains("idle");
+const fxActive = () => on && TH !== "wasser" && (W.rain || W.snow || W.storm) && !document.hidden && !reduce.matches && !document.body.classList.contains("idle") && !document.body.classList.contains("sc-pause");
 function spawn(top) {
   const z = .25 + Math.random() * .75, snow = !!W.snow && !(W.rain && Math.random() < .5);
   return { x: Math.random() * (fx.w + 120) - 60, y: top ? Math.random() * fx.h : -20 - Math.random() * 40, z, snow, ph: Math.random() * 6.28, f: .6 + Math.random() * 1.2 };
@@ -3898,8 +3467,25 @@ function fxStep(now) {
 }
 document.addEventListener("visibilitychange", () => fxSync());
 new MutationObserver(() => fxSync()).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+// ---------- Leistung: Himmel hält an, solange man ihn nicht sieht ----------
+// Weggescrollt oder von einem Fenster/den Details verdeckt → alle Himmel-Animationen pausieren (CSS über body.sc-pause, der Rest hier).
+// Vorher lief alles weiter und wurde bei jedem Bild neu gezeichnet – auch unter dem Milchglas der Fenster. Das war der größte Ruckler am Handy und Mac.
+let scSeen = true, scPaused = false;
+const SC_COVER = ".overlay:not([hidden]), .drawer:not([hidden]), .search:not([hidden]), .auth:not([hidden]), .upd-screen:not([hidden])";
+function scPauseSync() {
+  const b = document.body.classList, p = !scSeen || (!b.contains("fokus") && !!document.querySelector(SC_COVER));
+  const all = p || b.contains("idle");
+  if (p !== b.contains("sc-pause")) b.toggle("sc-pause", p);
+  if (all === scPaused) return;
+  scPaused = all;
+  try { for (const a of box.getAnimations({ subtree: true })) { if (typeof CSSAnimation !== "undefined" && a instanceof CSSAnimation) continue; if (all) a.pause(); else if (a.playState === "paused") a.play(); } } catch {}
+}
+try { new IntersectionObserver((es) => { scSeen = es[es.length - 1].isIntersecting; scPauseSync(); }).observe(box); } catch {}
+let scPT = 0; const scPauseSoon = () => { if (!scPT) scPT = setTimeout(() => { scPT = 0; scPauseSync(); }, 0); };
+new MutationObserver(scPauseSoon).observe(document.body, { attributes: true, attributeFilter: ["hidden"], subtree: true, childList: true }); // Fenster/Details gehen auf oder zu
+new MutationObserver(scPauseSoon).observe(document.body, { attributes: true, attributeFilter: ["class"] }); // Fokus-Modus, Fenster inaktiv
 let built = false, on = false, tick = 0, evT = 0, leafT = 0, fwT = 0;
-const quiet = () => document.hidden || reduce.matches; // Ereignisse auch, wenn Erledigt sichtbar, aber nicht aktiv ist – nur nicht minimiert/verdeckt
+const quiet = () => document.hidden || reduce.matches || document.body.classList.contains("sc-pause"); // Ereignisse auch, wenn Erledigt sichtbar, aber nicht aktiv ist – nur nicht minimiert/verdeckt
 let lastEv = 0;
 const fire = (name) => { lastEv = Date.now(); EV[name](); };
 function nextEvent() { clearTimeout(evT); evT = setTimeout(() => { if (on && !quiet()) { lastEv = Date.now(); randomEvent(); } nextEvent(); }, (180 + Math.random() * 180) * 1000); }
@@ -4082,7 +3668,7 @@ $("hero-wx").addEventListener("click", (e) => {
   pop.style.left = r.left + "px"; pop.style.top = r.bottom + 8 + "px"; pop.hidden = !pop.hidden;
 });
 document.addEventListener("click", (e) => { if (!$("wx-pop").hidden && !$("wx-pop").contains(e.target)) $("wx-pop").hidden = true; });
-addEventListener("scroll", () => ($("wx-pop").hidden = true), { passive: true });
+addEventListener("scroll", () => { const p = $("wx-pop"); if (!p.hidden) p.hidden = true; }, { passive: true }); // nur anfassen, wenn offen – sonst rechnet der Browser bei jedem Scroll-Schritt alle Stile neu
 setInterval(() => loadWeek(), 30 * 60e3);
 
 // Nach jedem Zeichnen mitziehen
@@ -4312,50 +3898,6 @@ if (!window.desktop && matchMedia("(hover: none)").matches) {
     setTimeout(() => (swiped = false), 60);
   };
   $("tasks").addEventListener("touchend", swEnd); $("tasks").addEventListener("touchcancel", swEnd);
-}
-
-// ---------- Handy-KI (Android-App ab 3.0): Assistent-Knopf öffnet das native Fenster mit Gemini Nano ----------
-// Die App startet die Seite mit ?app=android3. Wir merken uns das, zeigen den ✦-Knopf und übergeben beim Öffnen die offenen Aufgaben.
-// Antworten mit Aktionen kommen als ?ai=<base64-JSON> zurück und werden hier wie am PC angewendet (aiApply).
-if (!window.desktop) {
-  const qs = new URLSearchParams(location.search);
-  if (qs.get("app") === "android3") store.set("erledigt-android-ai", true);
-  const NATIVE_AI = store.get("erledigt-android-ai", false) && /Android/.test(navigator.userAgent);
-  if (NATIVE_AI) document.body.classList.add("native-ai");
-  const b64u = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const unb64 = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))));
-  $("ai-btn")?.addEventListener("click", (e) => {
-    if (!NATIVE_AI) return;
-    e.stopImmediatePropagation(); e.preventDefault();
-    const open = aiOpen().slice(0, 25), t = todayD();
-    // Einmal-Schlüssel: nur Antworten aus genau diesem Fenster dürfen Aufgaben ändern (fremde ?ai=-Links werden ignoriert)
-    const nonce = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
-    store.set("erledigt-ai-nonce", { n: nonce, at: Date.now() });
-    const c = {
-      nonce,
-      name: userName(), priv: privMode(), theme: document.body.classList.contains("is-dark") ? "dark" : "light",
-      accent: (getComputedStyle(document.documentElement).getPropertyValue("--accent").trim().match(/^#[0-9a-f]{6}$/i) || [""])[0],
-      today: `${WD[t.getDay()]} ${iso(t)}`, days: Array.from({ length: 7 }, (_, i) => { const d = addDays(t, i + 1); return `${WD[d.getDay()].slice(0, 2)} ${iso(d)}`; }).join(", "),
-      done: items.filter((x) => x.done && x.doneAt && iso(new Date(x.doneAt)) === iso(t)).length,
-      tasks: open.map((x) => ({ t: x.title.slice(0, 90), due: x.due || "", time: x.time || "", list: listById[x.list]?.name || "", prio: x.prio })),
-      ids: open.map((x) => x.id),
-    };
-    location.href = `intent://ai?ctx=${b64u(JSON.stringify(c))}#Intent;scheme=erledigt;package=de.erledigt.app;end`;
-  }, true);
-  const aiq = qs.get("ai");
-  if (aiq) {
-    history.replaceState(null, "", location.pathname);
-    let tries = 40;
-    const go = () => {
-      if (!loaded) { if (tries-- > 0) setTimeout(go, 250); return; }
-      try {
-        const { a, ids, nonce } = JSON.parse(unb64(aiq)), ok = store.get("erledigt-ai-nonce", null);
-        if (!ok || !nonce || nonce !== ok.n || Date.now() - ok.at > 2 * 3600e3) { showToast("Unbekannter Assistenten-Link – ignoriert"); return; }
-        if (aiApply(a, ids, null)) { sfx.done?.(); showToast(a.typ === "neue_aufgabe" ? `Aufgabe „${a.titel}“ angelegt` : "Übernommen"); render(); } else showToast("Das ging nicht – Aufgabe nicht gefunden"); }
-      catch { showToast("Aktion vom Assistenten war unlesbar"); }
-    };
-    go();
-  }
 }
 
 })();

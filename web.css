@@ -3,8 +3,6 @@
 body.web.has-scene .hero .hello { padding-top: calc(46px + env(safe-area-inset-top, 0px)); }
 body.web .hero-icons { top: calc(46px + env(safe-area-inset-top, 0px)); }
 body.web { padding-bottom: env(safe-area-inset-bottom, 0px); }
-/* Lokale KI gibt es nur in der PC-App */
-body.web #ai-btn, body.web [data-ai-open] { display: none !important; }
 /* Kein Zoomen beim Antippen von Eingabefeldern (iOS zoomt unter 16px) */
 body.web input, body.web textarea, body.web select { font-size: max(16px, 1em); }
 /* Seitenleiste: Erfolge, Version, Konto erscheinen am PC erst beim Hinzeigen – am Handy gibt es kein Hinzeigen */
@@ -31,7 +29,6 @@ body.web { touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   body.web #lists button { min-height: 44px; }
   /* Details: volle Höhe, PC-Kram aus */
   body.web .drawer { width: 100%; top: 0; bottom: 0; height: auto; max-height: none; border-left: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
-  body.web .drawer [data-d="ai"] { display: none !important; }
   /* Bilder-Feld: am Handy heißt es einfach „Foto hinzufügen“ (öffnet Kamera/Galerie) statt „Strg+V … ziehen“ */
   body.web .drawer #drop { font-size: 0; padding-block: 14px; }
   body.web .drawer #drop::after { content: "+ Foto hinzufügen"; font-size: 15px; font-weight: 600; }
@@ -52,5 +49,3 @@ body.web { touch-action: manipulation; -webkit-tap-highlight-color: transparent;
   body.web .drawer .x { min-width: 44px; }
   body.web .solve-never { padding: 10px 0; }
 }
-/* Android-App mit Handy-KI: ✦-Knopf wieder zeigen */
-body.web.native-ai #ai-btn { display: grid !important; }
