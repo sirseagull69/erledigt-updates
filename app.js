@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.3 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.4 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1377,6 +1377,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.9.4": ["Handy und iPhone: Die Landschaft ist jetzt ein ruhiges Bild statt einer laufenden Animation – das Ruckeln beim Scrollen sollte weg sein", "Wer die Bewegung zurück will: Einstellungen → Extras → Bewegter Himmel"],
   "2.9.3": ["Fjord: der graue Streifen im Himmel ist weg – die Berge spiegeln sich jetzt wirklich im Wasser", "Fjord: kein heller Balken mehr an der Wasserlinie, keine Sterne mehr mitten im Berg"],
   "2.9.2": ["Ohne Verbindung geht nichts mehr verloren: Änderungen bleiben gespeichert und werden nachgeschickt, sobald das Netz wieder da ist", "Doppelklick auf einen Titel benennt wieder um – und Getipptes bleibt, auch wenn gerade ein anderes Gerät synchronisiert", "Verpasste Erinnerung (PC war im Ruhezustand) wird am selben Tag nachgereicht", "Der Assistent Origami (lokale KI) ist vorerst ausgebaut – die App ist dadurch deutlich kleiner"],
   "2.9.1": ["Flüssiger, vor allem am Handy und Mac: Der Himmel pausiert, wenn ein Fenster offen ist oder du weiterscrollst", "Arbeit und Privat sind strikt getrennt – im Arbeitsmodus ist nichts Privates mehr zu sehen (Listen, Zähler, Suche, Kalender, Planung, Assistent)", "Fenster und Menüs sind am Handy und Mac deckend statt Milchglas – umstellbar unter Einstellungen → Extras → Glas-Effekt", "Handy: Wochenansicht mit Tagen untereinander, Erinnerungen unten, Tagesplanung lesbar, kein heller Streifen über dem Himmel"],
@@ -1581,7 +1582,7 @@ function renderDesign() {
       <button type="button" class="st-item" id="setup-open"><span class="st-l"><b>Name & Wetter-Ort</b><small>${esc(design.name || "kein Name")} · ${esc(weatherPlace().name)}</small></span>${chev}</button>
     </div>
     <h3 style="margin-top:14px">Erinnern vor dem Termin</h3>${opt("vorlauf", [[0, "Pünktlich"], [5, "5 Min"], [15, "15 Min"], [30, "30 Min"], [60, "1 Std"]], +(design.vorlauf || 0))}<small class="muted" style="display:block;margin-top:6px">Gilt am PC, Mac und Handy.</small></section>
-    <section class="st-sec"><h3>Extras</h3><div class="st-list">${tog("w.scene", "Himmel oben", "Landschaft mit echtem Wetter und Tageszeit", design.w.scene)}${design.w.scene ? tog("w.hoch", "Große Landschaft", "Hoch, mit Wiese und Bäumen vorne – aus: schmales Band wie früher", design.w.hoch !== false) : ""}${tog("w.glass", "Glas-Effekt", "Durchscheinende Fenster – schick, braucht aber mehr Leistung", glassOn())}${tog("sound", "Sounds", "Kleine Töne beim Abhaken", soundOn)}${tog("levels", "Level & XP", "Punkte und Erfolge fürs Erledigen", levelsOn)}</div></section>
+    <section class="st-sec"><h3>Extras</h3><div class="st-list">${tog("w.scene", "Himmel oben", "Landschaft mit echtem Wetter und Tageszeit", design.w.scene)}${design.w.scene ? tog("w.hoch", "Große Landschaft", "Hoch, mit Wiese und Bäumen vorne – aus: schmales Band wie früher", design.w.hoch !== false) : ""}${design.w.scene ? tog("w.motion", "Bewegter Himmel", "Ziehende Wolken, Regen, Tiere – am Handy aus, damit nichts ruckelt", !document.body.classList.contains("sc-lite")) : ""}${tog("w.glass", "Glas-Effekt", "Durchscheinende Fenster – schick, braucht aber mehr Leistung", glassOn())}${tog("sound", "Sounds", "Kleine Töne beim Abhaken", soundOn)}${tog("levels", "Level & XP", "Punkte und Erfolge fürs Erledigen", levelsOn)}</div></section>
     ${design.w.scene && window.__scene ? (() => { const st = window.__scene.skyTest.state(), row = (k, cur, list) => `<div class="opt-row" role="group">${list.map(([v, l]) => `<button type="button" data-sky-${k}="${v}" aria-pressed="${cur === v}">${l}</button>`).join("")}</div>`;
       return `<details class="ds-more st-sec"><summary>Himmel testen</summary>
       <h3>Wetter</h3>${row("w", st.weather, [["echt", "Echt"], ["sonne", "Sonne"], ["wolken", "Wolken"], ["regen", "Regen"], ["schnee", "Schnee"], ["gewitter", "Gewitter"], ["nebel", "Nebel"]])}
@@ -1615,6 +1616,7 @@ $("design-overlay").addEventListener("click", (e) => {
   if (t) {
     const id = t.dataset.tog;
     if (id === "w.glass") design.w.glass = !glassOn();
+    else if (id === "w.motion") design.w.motion = document.body.classList.contains("sc-lite");
     else if (id.startsWith("w.")) design.w[id.slice(2)] = !design.w[id.slice(2)];
     else if (id === "levels") { $("lvl-toggle").click(); }
     else if (id === "sound") { $("sound").click(); }
@@ -3385,7 +3387,7 @@ function fxSize() {
   if (Math.round(r.width) !== fx.w || Math.round(r.height) !== fx.h || dpr !== fx.dpr) { fx.w = Math.round(r.width); fx.h = Math.round(r.height); fx.dpr = dpr; fxc.width = fx.w * dpr; fxc.height = fx.h * dpr; fx.parts = []; }
   return true;
 }
-const fxActive = () => on && TH !== "wasser" && (W.rain || W.snow || W.storm) && !document.hidden && !reduce.matches && !document.body.classList.contains("idle") && !document.body.classList.contains("sc-pause");
+const fxActive = () => on && TH !== "wasser" && (W.rain || W.snow || W.storm) && !document.hidden && !reduce.matches && !lite && !document.body.classList.contains("idle") && !document.body.classList.contains("sc-pause");
 function spawn(top) {
   const z = .25 + Math.random() * .75, snow = !!W.snow && !(W.rain && Math.random() < .5);
   return { x: Math.random() * (fx.w + 120) - 60, y: top ? Math.random() * fx.h : -20 - Math.random() * 40, z, snow, ph: Math.random() * 6.28, f: .6 + Math.random() * 1.2 };
@@ -3478,12 +3480,39 @@ new MutationObserver(() => fxSync()).observe(document.body, { attributes: true, 
 // Weggescrollt oder von einem Fenster/den Details verdeckt → alle Himmel-Animationen pausieren (CSS über body.sc-pause, der Rest hier).
 // Vorher lief alles weiter und wurde bei jedem Bild neu gezeichnet – auch unter dem Milchglas der Fenster. Das war der größte Ruckler am Handy und Mac.
 let scSeen = true, scPaused = false;
+// ---------- Ruhiger Himmel (Standard am Handy/Tablet, vor allem fürs iPhone) ----------
+// Safari zeichnet SVG samt Weichzeichner-Filtern auf dem Prozessor und bei jeder Bewegung darin komplett neu – in dreifacher Auflösung.
+// Darum dort: Die Landschaft wird einmal als fertiges Bild in eine Canvas gelegt (neu nur, wenn sich Licht/Wetter ändert, also etwa
+// einmal pro Minute), nichts bewegt sich, und Maske + Körnung (teuer beim Scrollen) entfallen – den Verlauf nach unten macht ein einfacher Farbverlauf.
+// Umstellbar: Einstellungen → Extras → „Bewegter Himmel“ (design.w.motion, pro Gerät).
+let lite = false, bakeN = 0, bakeT = 0;
+const liteWanted = () => { try { return typeof design.w.motion === "boolean" ? !design.w.motion : !window.desktop && matchMedia("(hover: none)").matches; } catch { return false; } };
+const bakeC = document.createElement("canvas"); bakeC.className = "sc-bake"; box.insertBefore(bakeC, mv);
+function bake() {
+  bakeT = 0;
+  if (!lite || !on || !built) return;
+  const r = box.getBoundingClientRect(); if (!r.width || !r.height) return;
+  const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(r.width), h = Math.round(r.height), n = ++bakeN;
+  try {
+    const clone = svg.cloneNode(true); clone.setAttribute("xmlns", NS); clone.setAttribute("width", w); clone.setAttribute("height", h); clone.removeAttribute("style");
+    const img = new Image();
+    img.onload = () => {
+      if (n !== bakeN || !lite) return;
+      if (bakeC.width !== Math.round(w * dpr) || bakeC.height !== Math.round(h * dpr)) { bakeC.width = Math.round(w * dpr); bakeC.height = Math.round(h * dpr); }
+      const g = bakeC.getContext("2d"); g.clearRect(0, 0, bakeC.width, bakeC.height); g.drawImage(img, 0, 0, bakeC.width, bakeC.height);
+      box.classList.add("baked");
+    };
+    img.onerror = () => { if (n === bakeN) box.classList.remove("baked"); }; // dann bleibt einfach die lebende SVG stehen
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(clone));
+  } catch { box.classList.remove("baked"); }
+}
+const bakeSoon = () => { if (lite && !bakeT) bakeT = setTimeout(bake, 120); };
 const SC_COVER = ".overlay:not([hidden]), .drawer:not([hidden]), .search:not([hidden]), .auth:not([hidden]), .upd-screen:not([hidden])";
-function scPauseSync() {
+function scPauseSync(force) {
   const b = document.body.classList, p = !scSeen || (!b.contains("fokus") && !!document.querySelector(SC_COVER));
-  const all = p || b.contains("idle");
+  const all = p || b.contains("idle") || lite;
   if (p !== b.contains("sc-pause")) b.toggle("sc-pause", p);
-  if (all === scPaused) return;
+  if (all === scPaused && force !== true) return;
   scPaused = all;
   try { for (const a of box.getAnimations({ subtree: true })) { if (typeof CSSAnimation !== "undefined" && a instanceof CSSAnimation) continue; if (all) a.pause(); else if (a.playState === "paused") a.play(); } } catch {}
 }
@@ -3492,7 +3521,7 @@ let scPT = 0; const scPauseSoon = () => { if (!scPT) scPT = setTimeout(() => { s
 new MutationObserver(scPauseSoon).observe(document.body, { attributes: true, attributeFilter: ["hidden"], subtree: true, childList: true }); // Fenster/Details gehen auf oder zu
 new MutationObserver(scPauseSoon).observe(document.body, { attributes: true, attributeFilter: ["class"] }); // Fokus-Modus, Fenster inaktiv
 let built = false, on = false, tick = 0, evT = 0, leafT = 0, fwT = 0;
-const quiet = () => document.hidden || reduce.matches || document.body.classList.contains("sc-pause"); // Ereignisse auch, wenn Erledigt sichtbar, aber nicht aktiv ist – nur nicht minimiert/verdeckt
+const quiet = () => document.hidden || reduce.matches || lite || document.body.classList.contains("sc-pause"); // Ereignisse auch, wenn Erledigt sichtbar, aber nicht aktiv ist – nur nicht minimiert/verdeckt
 let lastEv = 0;
 const fire = (name) => { lastEv = Date.now(); EV[name](); };
 function nextEvent() { clearTimeout(evT); evT = setTimeout(() => { if (on && !quiet()) { lastEv = Date.now(); randomEvent(); } nextEvent(); }, (180 + Math.random() * 180) * 1000); }
@@ -3500,9 +3529,15 @@ window.addEventListener("focus", () => { if (on && !quiet() && Date.now() - last
 function measure() { const w = box.clientWidth, h = box.clientHeight; return w && h ? Math.max(700, Math.min(2600, Math.round(SH * w / h))) : SW; }
 let seasonTest = null, playing = 0;
 function refresh() { if (!on || playing) return; const s = seasonTest || realSeason(), nw = measure(); if (s !== season || !built || theme() !== TH || Math.abs(nw - SW) > 30 || JSON.stringify(fest()) !== L.festKey) { season = s; SW = nw; build(); built = true; } else if (wKey() !== wxKey) buildClouds(); draw(minuteNow()); }
-let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); }, 250); }).observe(box); } catch {}
+let rsT = 0; try { new ResizeObserver(() => { clearTimeout(rsT); rsT = setTimeout(() => { if (on && Math.abs(measure() - SW) > 30) refresh(); else bakeSoon(); }, 250); }).observe(box); } catch {}
+const drawRaw = draw;
+draw = function (m) { drawRaw(m); if (lite) { scPauseSync(true); bakeSoon(); } };
 sceneSync = () => {
   const want = !!design.w.scene;
+  const wasLite = lite; lite = want && liteWanted();
+  document.body.classList.toggle("sc-lite", lite);
+  if (!lite) box.classList.remove("baked");
+  if (lite !== wasLite) { scPauseSync(true); fxSync(); }
   const hoch = scHoch() ? 300 : 210; if (built && hoch !== SH) built = false;
   document.body.classList.toggle("has-scene", want); document.body.classList.toggle("scene-flach", want && hoch === 210);
   if (typeof syncTitlebar === "function") syncTitlebar();

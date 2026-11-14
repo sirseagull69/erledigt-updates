@@ -932,3 +932,17 @@ body.no-glass .upd-screen { background: var(--bg); -webkit-backdrop-filter: none
   .wx-pop { left: 12px !important; right: 12px; width: auto; }
   .search { padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 12px; }
 }
+/* ---------- 2.9.4: Ruhiger Himmel (Handy/Tablet, iPhone) – siehe 09b-himmel.js ---------- */
+.sc-bake { position: absolute; inset: 0; width: 100%; height: 100%; display: none; pointer-events: none; }
+.sc.baked > .sc-bake { display: block; }
+.sc.baked > svg:first-child { visibility: hidden; } /* die lebende SVG bleibt als Vorlage, wird aber nicht mehr gezeichnet */
+body.sc-lite .sc * { animation-play-state: paused !important; }
+body.sc-lite .sc-grain, body.sc-lite .sc-fx, body.sc-lite .sc-flash { display: none; }
+body.sc-lite .sc-move { will-change: auto; }
+/* Verlauf nach unten als einfacher Farbverlauf statt Maske (gleiche Prozentwerte wie die Masken oben) */
+body.sc-lite:not(.fokus) .hero .sc { -webkit-mask-image: none !important; mask-image: none !important; --sc-fade: 88%; }
+body.sc-lite:not(.fokus) .hero .sc::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(transparent var(--sc-fade), var(--bg)); }
+:root[data-theme="dark"] body.sc-lite:not(.fokus) .hero .sc { --sc-fade: 86%; }
+:root[data-theme="dark"] body.sc-lite.has-scene:not(.scene-flach):not(.fokus) .hero .sc { --sc-fade: 58%; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) body.sc-lite:not(.fokus) .hero .sc { --sc-fade: 86%; }
+  :root:not([data-theme="light"]) body.sc-lite.has-scene:not(.scene-flach):not(.fokus) .hero .sc { --sc-fade: 58%; } }
