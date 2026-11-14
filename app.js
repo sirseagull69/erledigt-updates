@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.2 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.3 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1377,6 +1377,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.9.3": ["Fjord: der graue Streifen im Himmel ist weg – die Berge spiegeln sich jetzt wirklich im Wasser", "Fjord: kein heller Balken mehr an der Wasserlinie, keine Sterne mehr mitten im Berg"],
   "2.9.2": ["Ohne Verbindung geht nichts mehr verloren: Änderungen bleiben gespeichert und werden nachgeschickt, sobald das Netz wieder da ist", "Doppelklick auf einen Titel benennt wieder um – und Getipptes bleibt, auch wenn gerade ein anderes Gerät synchronisiert", "Verpasste Erinnerung (PC war im Ruhezustand) wird am selben Tag nachgereicht", "Der Assistent Origami (lokale KI) ist vorerst ausgebaut – die App ist dadurch deutlich kleiner"],
   "2.9.1": ["Flüssiger, vor allem am Handy und Mac: Der Himmel pausiert, wenn ein Fenster offen ist oder du weiterscrollst", "Arbeit und Privat sind strikt getrennt – im Arbeitsmodus ist nichts Privates mehr zu sehen (Listen, Zähler, Suche, Kalender, Planung, Assistent)", "Fenster und Menüs sind am Handy und Mac deckend statt Milchglas – umstellbar unter Einstellungen → Extras → Glas-Effekt", "Handy: Wochenansicht mit Tagen untereinander, Erinnerungen unten, Tagesplanung lesbar, kein heller Streifen über dem Himmel"],
   "2.9.0": ["Großer Frühjahrsputz: schneller, sparsamer im Hintergrund, aufgeräumter Code", "Origami ist schlauer – mehr Gedächtnis, kürzere und passendere Anweisungen", "Handy: Listen als Pillen oben, Aufgaben sofort sichtbar, größere Tippflächen", "Fokus-Modus zeigt wieder Timer und Knöpfe", "Einkaufen: „gekauft“ lässt sich rückgängig machen", "Sicherheit: Assistenten-Links von außen werden ignoriert"],
@@ -2697,7 +2698,7 @@ function build() {
   const SR = seeded(7);
   for (let i = 0; i < SW / 8; i++) mk("circle", { cx: SR() * SW, cy: SR() * 140, r: SR() < .08 ? 1.3 : .35 + SR() * .7, fill: "#fff" }, L.stars);
   L.twinkle = mk("g", {}, mv);
-  for (let i = 0; i < 10; i++) mk("circle", { class: "star", cx: SR() * SW, cy: SR() * 120, r: 1.1, fill: "#fff", style: `animation-delay:${SR() * 3.4}s` }, L.twinkle);
+  for (let i = 0; i < 10; i++) mk("circle", { class: "star", cx: SR() * SW, cy: SR() * (["fjord", "alpen"].includes(theme()) ? 48 : 120), r: 1.1, fill: "#fff", style: `animation-delay:${SR() * 3.4}s` }, L.twinkle);
   // Mond (echte Phase)
   L.moon = mk("g", {});
   mk("circle", { r: 46, fill: "url(#sc-mglow)" }, L.moon);
@@ -2954,7 +2955,10 @@ function buildFjord(defs) {
   mk("rect", { x: 0, y: HZ, width: SW, height: SH - HZ + 20, fill: "url(#sc-lake)" });
   // Spiegelung: Kopien von Nordlicht und Bergen, gespiegelt und nur im Wasser sichtbar
   const rc = mk("clipPath", { id: "sc-fjc" }, defs); mk("rect", { x: 0, y: HZ, width: SW, height: SH - HZ + 20 }, rc);
-  const rg = mk("g", { "clip-path": "url(#sc-fjc)", transform: `translate(0 ${2 * HZ}) scale(1 -1)`, opacity: .55 });
+  // Ausschnitt und Spiegelung müssen auf getrennten Gruppen liegen: Auf derselben Gruppe wurde der Ausschnitt mitgespiegelt –
+  // die Spiegelbilder landeten als grauer Streifen mit harter Kante im Himmel statt im Wasser.
+  const rclip = mk("g", { "clip-path": "url(#sc-fjc)" });
+  const rg = mk("g", { transform: `translate(0 ${2 * HZ}) scale(1 -1)`, opacity: .55 }, rclip);
   L.auroraR = mk("g", { opacity: 0 }, rg); L.aurora.querySelectorAll("path").forEach((p) => { const c = mk("path", { d: p.getAttribute("d"), fill: "url(#sc-aur)", filter: "url(#sc-blur8)", opacity: p.getAttribute("opacity") }, L.auroraR); });
   layerEls.forEach((p) => { const c = mk("path", { d: p.getAttribute("d") }, rg); L.refl.push([c, p]); });
   L.shimmer = mk("g", {}, mv);
@@ -3120,7 +3124,10 @@ function draw(m) {
   leafEls.forEach(([el, li, ci]) => { const base = layerEls[li].dataset.c, pal = se.leaf; el.setAttribute("fill", pal.length ? mix(base, pal[ci % pal.length], (.3 + (li - 2) * .07) * (.08 + .92 * d)) : base); el.setAttribute("opacity", pal.length ? 1 : 0); });
   if (L.festGlow) L.festGlow.forEach(([el, k]) => { if (k < 0) el.setAttribute("opacity", .55 + d * .45); else el.setAttribute("opacity", Math.min(1, (.35 + night * .65) * k)); });
   if (L.festDark && layerEls.length) L.festDark.forEach((el) => el.setAttribute("fill", mix(layerEls[layerEls.length - 1].dataset.c, "#2E6B40", .25 + .45 * d)));
-  { const tq = TH === "alpen" ? .45 * d : 0; document.getElementById("sc-lk0").setAttribute("stop-color", mix(mix(hor, "#000000", .1), "#3FB0BE", tq)); document.getElementById("sc-lk1").setAttribute("stop-color", mix(mix(mid, "#000000", .25), "#1F7F8C", tq)); }
+  { const tq = TH === "alpen" ? .45 * d : 0; // Fjord: Das Wasser liegt direkt unter dunkleren Bergen. Mit der hellen Horizontfarbe als Oberkante entstand dort ein harter, heller Streifen quer übers Fenster –
+    // darum hier oben schon ein gedämpftes Blau (zwischen Himmelsmitte und Horizont), nach unten tiefer.
+    const fj = TH === "fjord";
+    document.getElementById("sc-lk0").setAttribute("stop-color", fj ? mix(mix(mid, hor, .22), "#0B1A33", .34) : mix(mix(hor, "#000000", .1), "#3FB0BE", tq)); document.getElementById("sc-lk1").setAttribute("stop-color", fj ? mix(mix(top, mid, .4), "#060D1F", .5) : mix(mix(mid, "#000000", .25), "#1F7F8C", tq)); }
   L.shimmer.setAttribute("opacity", TH === "wasser" ? lt * .55 : .25 + d * .35);
   if (TH === "wasser") {
     L.shafts.setAttribute("opacity", (lt * .9).toFixed(2));
