@@ -2,7 +2,7 @@
 
 Persönliche To-do-App. Hier liegen nur die fertigen Installer (unter **Releases**), kein Quellcode.
 
-## ⬇️ Aktuelle Version: 2.9.3
+## ⬇️ Aktuelle Version: 2.9.4
 
 | System | Datei |
 |---|---|
