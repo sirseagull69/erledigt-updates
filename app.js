@@ -1,4 +1,4 @@
-// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.4 als Web-App
+// AUTOMATISCH ERZEUGT (build/web.js) – Erledigt 2.9.5 als Web-App
 (() => {
 // ===== 01-grundlagen.js =====
 // ---------- Konstanten ----------
@@ -1377,6 +1377,7 @@ $("addform").addEventListener("submit", (e) => {
 // ---------- Mitteilungs-Zentrale ----------
 // ======================================================================
 const CHANGELOG = {
+  "2.9.5": ["Handy: Der Arbeit/Privat-Schalter ist hochkant wieder da – die Landschaft hat ihn seit 2.9.4 zugedeckt"],
   "2.9.4": ["Handy und iPhone: Die Landschaft ist jetzt ein ruhiges Bild statt einer laufenden Animation – das Ruckeln beim Scrollen sollte weg sein", "Wer die Bewegung zurück will: Einstellungen → Extras → Bewegter Himmel"],
   "2.9.3": ["Fjord: der graue Streifen im Himmel ist weg – die Berge spiegeln sich jetzt wirklich im Wasser", "Fjord: kein heller Balken mehr an der Wasserlinie, keine Sterne mehr mitten im Berg"],
   "2.9.2": ["Ohne Verbindung geht nichts mehr verloren: Änderungen bleiben gespeichert und werden nachgeschickt, sobald das Netz wieder da ist", "Doppelklick auf einen Titel benennt wieder um – und Getipptes bleibt, auch wenn gerade ein anderes Gerät synchronisiert", "Verpasste Erinnerung (PC war im Ruhezustand) wird am selben Tag nachgereicht", "Der Assistent Origami (lokale KI) ist vorerst ausgebaut – die App ist dadurch deutlich kleiner"],
@@ -3494,16 +3495,31 @@ function bake() {
   const r = box.getBoundingClientRect(); if (!r.width || !r.height) return;
   const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(r.width), h = Math.round(r.height), n = ++bakeN;
   try {
-    const clone = svg.cloneNode(true); clone.setAttribute("xmlns", NS); clone.setAttribute("width", w); clone.setAttribute("height", h); clone.removeAttribute("style");
-    const img = new Image();
-    img.onload = () => {
+    const ser = (el) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(el));
+    const prep = (el) => { el.setAttribute("xmlns", NS); el.setAttribute("width", w); el.setAttribute("height", h); el.removeAttribute("style"); el.removeAttribute("class"); return el; };
+    const c1 = prep(svg.cloneNode(true));
+    // Vordergrund-Ebene (Wolkenstreifen, Sterne, Boot …): Ihre Lage kommt aus angehaltenen Animationen – die gibt es im Bild nicht,
+    // also den gerade berechneten Stand (Verschiebung, Deckkraft) fest in die Kopie schreiben.
+    const c2 = prep(mv.cloneNode(true)), live = mv.querySelectorAll("*"), copy = c2.querySelectorAll("*");
+    for (let i = 0; i < live.length && i < copy.length; i++) {
+      const cs = getComputedStyle(live[i]);
+      if (cs.display === "none") { copy[i].setAttribute("display", "none"); continue; }
+      if (cs.transform && cs.transform !== "none") { copy[i].style.transformBox = cs.transformBox; copy[i].style.transformOrigin = cs.transformOrigin; copy[i].style.transform = cs.transform; }
+      if (cs.opacity !== "1") copy[i].style.opacity = cs.opacity;
+    }
+    const load = (src) => new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = src; });
+    const fade = document.body.classList.contains("fokus") ? 0 : parseFloat(getComputedStyle(box).getPropertyValue("--sc-fade")) || 0;
+    Promise.all([load(ser(c1)), load(ser(c2)).catch(() => null)]).then(([i1, i2]) => {
       if (n !== bakeN || !lite) return;
-      if (bakeC.width !== Math.round(w * dpr) || bakeC.height !== Math.round(h * dpr)) { bakeC.width = Math.round(w * dpr); bakeC.height = Math.round(h * dpr); }
-      const g = bakeC.getContext("2d"); g.clearRect(0, 0, bakeC.width, bakeC.height); g.drawImage(img, 0, 0, bakeC.width, bakeC.height);
+      const W = Math.round(w * dpr), Hh = Math.round(h * dpr);
+      if (bakeC.width !== W || bakeC.height !== Hh) { bakeC.width = W; bakeC.height = Hh; }
+      const g = bakeC.getContext("2d"); g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, W, Hh);
+      g.drawImage(i1, 0, 0, W, Hh); if (i2) g.drawImage(i2, 0, 0, W, Hh);
+      // Auslaufen nach unten gleich ins Bild rechnen (durchsichtig, wie vorher die Maske). Wichtig: Der Himmel liegt ÜBER den Listen –
+      // ein deckender Farbverlauf (2.9.4) hat am Handy den Arbeit/Privat-Schalter zugedeckt.
+      if (fade) { const gr = g.createLinearGradient(0, 0, 0, Hh); gr.addColorStop(0, "#000"); gr.addColorStop(Math.min(.99, fade / 100), "#000"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.globalCompositeOperation = "destination-in"; g.fillStyle = gr; g.fillRect(0, 0, W, Hh); g.globalCompositeOperation = "source-over"; }
       box.classList.add("baked");
-    };
-    img.onerror = () => { if (n === bakeN) box.classList.remove("baked"); }; // dann bleibt einfach die lebende SVG stehen
-    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(new XMLSerializer().serializeToString(clone));
+    }).catch(() => { if (n === bakeN) box.classList.remove("baked"); }); // dann bleibt einfach die lebende SVG stehen
   } catch { box.classList.remove("baked"); }
 }
 const bakeSoon = () => { if (lite && !bakeT) bakeT = setTimeout(bake, 120); };
@@ -3519,7 +3535,7 @@ function scPauseSync(force) {
 try { new IntersectionObserver((es) => { scSeen = es[es.length - 1].isIntersecting; scPauseSync(); }).observe(box); } catch {}
 let scPT = 0; const scPauseSoon = () => { if (!scPT) scPT = setTimeout(() => { scPT = 0; scPauseSync(); }, 0); };
 new MutationObserver(scPauseSoon).observe(document.body, { attributes: true, attributeFilter: ["hidden"], subtree: true, childList: true }); // Fenster/Details gehen auf oder zu
-new MutationObserver(scPauseSoon).observe(document.body, { attributes: true, attributeFilter: ["class"] }); // Fokus-Modus, Fenster inaktiv
+let scFok = false; new MutationObserver(() => { scPauseSoon(); const f = document.body.classList.contains("fokus"); if (f !== scFok) { scFok = f; bakeSoon(); } }).observe(document.body, { attributes: true, attributeFilter: ["class"] }); // Fokus-Modus, Fenster inaktiv
 let built = false, on = false, tick = 0, evT = 0, leafT = 0, fwT = 0;
 const quiet = () => document.hidden || reduce.matches || lite || document.body.classList.contains("sc-pause"); // Ereignisse auch, wenn Erledigt sichtbar, aber nicht aktiv ist – nur nicht minimiert/verdeckt
 let lastEv = 0;
